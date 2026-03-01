@@ -16,7 +16,7 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  base: ProcessingInstruction.env.VITE_BASE_PATH || "/frontend"
+  base: ProcessingInstruction.env.VITE_BASE_PATH || "/frontend",
 
   // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   assetsInclude: ['**/*.svg', '**/*.csv'],
