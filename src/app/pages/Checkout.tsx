@@ -1,24 +1,37 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useCart } from '../context/CartContext';
 import { useNavigate } from 'react-router';
 import { CreditCard, Smartphone, CheckCircle2, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '../context/AuthContext';
+import { orderService } from '../services';
 
 export const Checkout = () => {
   const { items, totalPrice, clearCart } = useCart();
   const navigate = useNavigate();
+  const { user, accessToken, isAuthenticated } = useAuth();
   const [paymentMethod, setPaymentMethod] = useState<'credit' | 'pix'>('credit');
   const [orderComplete, setOrderComplete] = useState(false);
   const [pixCode, setPixCode] = useState('');
-  const [shippingData, setShippingData] = useState<any>(null);
+  const [shippingData, setShippingData] = useState<any>(() => {
+    const saved = sessionStorage.getItem('shippingData');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [orderNumber, setOrderNumber] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [finalAmount, setFinalAmount] = useState<number>(0);
 
   useEffect(() => {
-    // Load shipping data from sessionStorage
-    const savedShippingData = sessionStorage.getItem('shippingData');
-    if (savedShippingData) {
-      setShippingData(JSON.parse(savedShippingData));
+    if (!isAuthenticated) {
+      navigate('/signin');
     }
-  }, []);
+  }, [isAuthenticated, navigate]);
+
+  useEffect(() => {
+    if (!shippingData) {
+      navigate('/shipping');
+    }
+  }, [shippingData, navigate]);
 
   const shippingCost = shippingData?.shippingOption?.price || 0;
   const totalWithShipping = totalPrice + shippingCost;
@@ -43,42 +56,88 @@ export const Checkout = () => {
     return `00020126580014BR.GOV.BCB.PIX0136${randomCode}5204000053039865802BR5913COMPIA EDITORA6009SAO PAULO62070503***6304${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (paymentMethod === 'credit' && (!formData.cardNumber || !formData.cardName || !formData.cardExpiry || !formData.cardCvv)) {
-      toast.error('Por favor, preencha os dados do cartão');
-      return;
+  const placeOrder = useCallback(async () => {
+    if (!user || !accessToken) {
+      throw new Error('Faça login para finalizar o pedido.');
     }
 
-    if (paymentMethod === 'pix') {
-      // Generate PIX code
+    if (!shippingData?.addressUid) {
+      throw new Error('Selecione um endereço de entrega.');
+    }
+
+    if (items.length === 0) {
+      throw new Error('Seu carrinho está vazio.');
+    }
+
+    const payload = {
+      address_uid: shippingData.addressUid,
+      items: items.map((item) => ({
+        product_id: Number(item.id),
+        quantity: item.quantity,
+      })),
+      shipping: shippingCost,
+      discount: 0,
+      note: shippingData?.personalInfo?.note || null,
+    };
+
+    const order = await orderService.create(user.uid, payload, accessToken);
+    setOrderNumber(order.order_number);
+    setFinalAmount(order.total ?? totalWithShipping);
+    await clearCart();
+    sessionStorage.removeItem('shippingData');
+  }, [user, accessToken, shippingData, items, shippingCost, totalWithShipping, clearCart]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (paymentMethod === 'credit') {
+      if (!formData.cardNumber || !formData.cardName || !formData.cardExpiry || !formData.cardCvv) {
+        toast.error('Por favor, preencha os dados do cartão');
+        return;
+      }
+
+      setIsSubmitting(true);
+      try {
+        await placeOrder();
+        setOrderComplete(true);
+        toast.success('Pagamento aprovado!');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Não foi possível finalizar o pedido.';
+        toast.error(message);
+      } finally {
+        setIsSubmitting(false);
+      }
+    } else {
       const code = generatePixCode();
       setPixCode(code);
       toast.success('Código PIX gerado com sucesso!');
-    } else {
-      // Process payment
-      setTimeout(() => {
-        setOrderComplete(true);
-        toast.success('Pagamento aprovado!');
-      }, 1500);
     }
   };
 
-  const confirmPixPayment = () => {
-    setOrderComplete(true);
-    toast.success('Pagamento confirmado!');
+  const confirmPixPayment = async () => {
+    setIsSubmitting(true);
+    try {
+      await placeOrder();
+      setOrderComplete(true);
+      toast.success('Pagamento confirmado!');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Não foi possível confirmar o pagamento.';
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
+      setPixCode('');
+    }
   };
 
-  if (items.length === 0) {
-    navigate('/cart');
-    return null;
-  }
+    if (items.length === 0 && !orderComplete) {
+      navigate('/cart');
+      return null;
+    }
 
   if (orderComplete) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg shadow-lg p-12 max-w-2xl text-center">
+          <div className="bg-white rounded-lg shadow-lg p-12 max-w-2xl text-center">
           <CheckCircle2 className="w-24 h-24 text-green-500 mx-auto mb-6" />
           <h1 className="text-4xl font-bold mb-4">Pedido Realizado com Sucesso!</h1>
           <p className="text-gray-600 mb-8">
@@ -89,11 +148,11 @@ export const Checkout = () => {
             <div className="space-y-2 text-sm text-gray-700">
               <div className="flex justify-between">
                 <span>Número do pedido:</span>
-                <span className="font-semibold">#COMP-{Math.floor(Math.random() * 100000)}</span>
+                <span className="font-semibold">{orderNumber ?? '—'}</span>
               </div>
               <div className="flex justify-between">
                 <span>Total:</span>
-                <span className="font-semibold">R$ {totalWithShipping.toFixed(2)}</span>
+                <span className="font-semibold">R$ {(finalAmount || totalWithShipping).toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Método de pagamento:</span>
@@ -104,7 +163,6 @@ export const Checkout = () => {
           <div className="flex gap-4 justify-center">
             <button
               onClick={() => {
-                clearCart();
                 navigate('/');
               }}
               className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
@@ -113,7 +171,6 @@ export const Checkout = () => {
             </button>
             <button
               onClick={() => {
-                clearCart();
                 navigate('/catalog');
               }}
               className="border border-gray-300 text-gray-700 px-8 py-3 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
@@ -168,9 +225,10 @@ export const Checkout = () => {
             <div className="space-y-3">
               <button
                 onClick={confirmPixPayment}
-                className="w-full bg-green-600 text-white px-6 py-4 rounded-lg font-semibold hover:bg-green-700 transition-colors"
+                disabled={isSubmitting}
+                className="w-full bg-green-600 text-white px-6 py-4 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50"
               >
-                Já Realizei o Pagamento
+                {isSubmitting ? 'Processando...' : 'Já Realizei o Pagamento'}
               </button>
               <button
                 onClick={() => setPixCode('')}
@@ -278,9 +336,14 @@ export const Checkout = () => {
 
               <button
                 type="submit"
-                className="w-full bg-blue-600 text-white px-6 py-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors text-lg"
+                disabled={isSubmitting}
+                className="w-full bg-blue-600 text-white px-6 py-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors text-lg disabled:opacity-50"
               >
-                {paymentMethod === 'pix' ? 'Gerar Código PIX' : 'Confirmar Pagamento'}
+                {paymentMethod === 'pix'
+                  ? 'Gerar Código PIX'
+                  : isSubmitting
+                  ? 'Processando...'
+                  : 'Confirmar Pagamento'}
               </button>
             </form>
           </div>

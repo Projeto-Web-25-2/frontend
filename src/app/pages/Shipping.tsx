@@ -3,6 +3,8 @@ import { useCart } from '../context/CartContext';
 import { useNavigate } from 'react-router';
 import { Truck, Clock, Package, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '../context/AuthContext';
+import { addressService } from '../services';
 
 interface ShippingOption {
   id: string;
@@ -15,6 +17,7 @@ interface ShippingOption {
 export const Shipping = () => {
   const { items, totalPrice } = useCart();
   const navigate = useNavigate();
+  const { user, accessToken, isAuthenticated } = useAuth();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -27,6 +30,7 @@ export const Shipping = () => {
     complement: '',
     city: '',
     state: '',
+    neighborhood: '',
   });
 
   const [selectedShipping, setSelectedShipping] = useState<string>('');
@@ -79,27 +83,56 @@ export const Shipping = () => {
     toast.success('Opções de frete calculadas!');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!isAuthenticated || !user || !accessToken) {
+      toast.error('Faça login para continuar.');
+      navigate('/signin');
+      return;
+    }
 
     if (!formData.name || !formData.email || !formData.phone) {
       toast.error('Por favor, preencha todos os campos obrigatórios');
       return;
     }
 
-    if (hasPhysicalItems && (!formData.address || !formData.cep || !selectedShipping)) {
-      toast.error('Por favor, preencha o endereço e selecione uma opção de frete');
-      return;
+    if (hasPhysicalItems) {
+      if (!formData.address || !formData.cep || !selectedShipping || !formData.neighborhood || !formData.city || !formData.state || !formData.number) {
+        toast.error('Por favor, preencha o endereço completo e selecione o frete');
+        return;
+      }
     }
 
-    // Save shipping data to sessionStorage to use in checkout
-    const shippingData = {
-      personalInfo: formData,
-      shippingOption: shippingOptions.find((opt) => opt.id === selectedShipping),
-    };
-    sessionStorage.setItem('shippingData', JSON.stringify(shippingData));
+    try {
+      const addressPayload = {
+        street: hasPhysicalItems ? formData.address : 'Entrega Digital',
+        street_number: hasPhysicalItems ? Number(formData.number) || 0 : 0,
+        neighborhood: hasPhysicalItems ? formData.neighborhood : 'N/A',
+        city: hasPhysicalItems ? formData.city : 'Online',
+        state_code: hasPhysicalItems ? formData.state.toUpperCase() : 'NA',
+        zip_code: hasPhysicalItems ? formData.cep : '00000000',
+        country: 'Brazil',
+        complement: formData.complement || null,
+        reference: null,
+        address_type: 'residential',
+        primary: true,
+      };
 
-    navigate('/checkout');
+      const addressResponse = await addressService.create(user.uid, addressPayload, accessToken);
+
+      const shippingData = {
+        personalInfo: formData,
+        shippingOption: shippingOptions.find((opt) => opt.id === selectedShipping) || null,
+        addressUid: addressResponse.uid,
+      };
+      sessionStorage.setItem('shippingData', JSON.stringify(shippingData));
+
+      navigate('/checkout');
+    } catch (error) {
+      console.error('Erro ao salvar endereço', error);
+      toast.error('Não foi possível salvar o endereço. Tente novamente.');
+    }
   };
 
   const getShippingIcon = (iconType: string) => {
@@ -175,77 +208,83 @@ export const Shipping = () => {
                 </div>
               </div>
 
-              {/* Shipping Address (only for physical items) */}
-              {hasPhysicalItems && (
-                <div className="bg-white rounded-lg shadow-md p-6">
-                  <h2 className="text-xl font-bold mb-4">Endereço de Entrega</h2>
-                  <div className="grid grid-cols-1 gap-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <input
-                        type="text"
-                        name="cep"
-                        placeholder="CEP *"
-                        value={formData.cep}
-                        onChange={handleInputChange}
-                        className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        maxLength={9}
-                      />
-                      <div className="md:col-span-2">
-                        {cepCalculated && (
-                          <div className="text-sm text-green-600 flex items-center gap-2 h-full">
-                            ✓ Frete calculado
-                          </div>
-                        )}
-                      </div>
-                    </div>
+              {/* Shipping Address */}
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h2 className="text-xl font-bold mb-4">Endereço de Entrega</h2>
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <input
                       type="text"
-                      name="address"
-                      placeholder="Endereço *"
-                      value={formData.address}
+                      name="cep"
+                      placeholder="CEP *"
+                      value={formData.cep}
+                      onChange={handleInputChange}
+                      className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      maxLength={9}
+                    />
+                    <div className="md:col-span-2">
+                      {cepCalculated && hasPhysicalItems && (
+                        <div className="text-sm text-green-600 flex items-center gap-2 h-full">
+                          ✓ Frete calculado
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <input
+                    type="text"
+                    name="address"
+                    placeholder="Endereço *"
+                    value={formData.address}
+                    onChange={handleInputChange}
+                    className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <input
+                    type="text"
+                    name="neighborhood"
+                    placeholder="Bairro *"
+                    value={formData.neighborhood}
+                    onChange={handleInputChange}
+                    className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <input
+                      type="text"
+                      name="number"
+                      placeholder="Número *"
+                      value={formData.number}
                       onChange={handleInputChange}
                       className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <input
-                        type="text"
-                        name="number"
-                        placeholder="Número *"
-                        value={formData.number}
-                        onChange={handleInputChange}
-                        className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <input
-                        type="text"
-                        name="complement"
-                        placeholder="Complemento"
-                        value={formData.complement}
-                        onChange={handleInputChange}
-                        className="md:col-span-2 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <input
-                        type="text"
-                        name="city"
-                        placeholder="Cidade *"
-                        value={formData.city}
-                        onChange={handleInputChange}
-                        className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <input
-                        type="text"
-                        name="state"
-                        placeholder="Estado *"
-                        value={formData.state}
-                        onChange={handleInputChange}
-                        className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        maxLength={2}
-                      />
-                    </div>
+                    <input
+                      type="text"
+                      name="complement"
+                      placeholder="Complemento"
+                      value={formData.complement}
+                      onChange={handleInputChange}
+                      className="md:col-span-2 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input
+                      type="text"
+                      name="city"
+                      placeholder="Cidade *"
+                      value={formData.city}
+                      onChange={handleInputChange}
+                      className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <input
+                      type="text"
+                      name="state"
+                      placeholder="Estado *"
+                      value={formData.state}
+                      onChange={handleInputChange}
+                      className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      maxLength={2}
+                    />
                   </div>
                 </div>
-              )}
+              </div>
 
               {/* Shipping Options */}
               {hasPhysicalItems && cepCalculated && shippingOptions.length > 0 && (
@@ -283,11 +322,10 @@ export const Shipping = () => {
                 </div>
               )}
 
-              {/* Digital Only Message */}
               {!hasPhysicalItems && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <p className="text-blue-800">
-                    📥 Seu pedido contém apenas e-books. Os arquivos estarão disponíveis imediatamente após a confirmação do pagamento.
+                    📥 Seu pedido contém apenas e-books. Os arquivos serão enviados assim que o pagamento for confirmado.
                   </p>
                 </div>
               )}

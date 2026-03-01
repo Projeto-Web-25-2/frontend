@@ -1,13 +1,59 @@
 import { Minus, Plus, Trash2, ShoppingBag, ArrowRight } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useNavigate } from 'react-router';
+import { useAuth } from '../context/AuthContext';
+import { toast } from 'sonner';
 
 export const Cart = () => {
-  const { items, updateQuantity, removeFromCart, totalPrice } = useCart();
+  const { items, updateQuantity, removeFromCart, totalPrice, isLoading } = useCart();
+  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   const shippingCost = items.some((item) => item.type === 'physical') ? 15.0 : 0;
   const totalWithShipping = totalPrice + shippingCost;
+
+  const handleQuantityChange = async (cartItemId: number, quantity: number) => {
+    try {
+      await updateQuantity(cartItemId, quantity);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Não foi possível atualizar a quantidade.';
+      toast.error(message);
+    }
+  };
+
+  const handleRemove = async (cartItemId: number) => {
+    try {
+      await removeFromCart(cartItemId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Não foi possível remover o item.';
+      toast.error(message);
+    }
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <ShoppingBag className="w-24 h-24 text-gray-300 mx-auto mb-6" />
+          <h2 className="text-3xl font-bold mb-4">Faça login para acessar o carrinho</h2>
+          <button
+            onClick={() => navigate('/signin')}
+            className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+          >
+            Entrar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-600">Carregando carrinho...</p>
+      </div>
+    );
+  }
 
   if (items.length === 0) {
     return (
@@ -56,7 +102,7 @@ export const Cart = () => {
                         </p>
                       </div>
                       <button
-                        onClick={() => removeFromCart(item.id)}
+                        onClick={() => handleRemove(item.cartItemId)}
                         className="text-red-500 hover:text-red-700 transition-colors"
                         aria-label="Remover item"
                       >
@@ -68,7 +114,7 @@ export const Cart = () => {
                       {/* Quantity Controls */}
                       <div className="flex items-center gap-3">
                         <button
-                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          onClick={() => handleQuantityChange(item.cartItemId, item.quantity - 1)}
                           className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 transition-colors"
                           aria-label="Diminuir quantidade"
                         >
@@ -76,7 +122,7 @@ export const Cart = () => {
                         </button>
                         <span className="font-semibold w-8 text-center">{item.quantity}</span>
                         <button
-                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          onClick={() => handleQuantityChange(item.cartItemId, item.quantity + 1)}
                           disabled={item.type === 'physical' && item.quantity >= item.stock}
                           className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           aria-label="Aumentar quantidade"

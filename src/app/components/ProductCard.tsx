@@ -12,10 +12,15 @@ export const ProductCard = ({ product }: ProductCardProps) => {
   const { addToCart } = useCart();
   const navigate = useNavigate();
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleAddToCart = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    addToCart(product);
-    toast.success(`${product.title} adicionado ao carrinho!`);
+    try {
+      await addToCart(product);
+      toast.success(`${product.title} adicionado ao carrinho!`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao adicionar ao carrinho.';
+      toast.error(message);
+    }
   };
 
   return (

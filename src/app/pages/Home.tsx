@@ -1,10 +1,43 @@
 import { ArrowRight, Sparkles, Truck, CreditCard, BookOpen } from 'lucide-react';
 import { Link } from 'react-router';
-import { products } from '../data/products';
+import { useEffect, useState } from 'react';
 import { ProductCard } from '../components/ProductCard';
+import { productService } from '../services';
+import { useAuth } from '../context/AuthContext';
+import type { Product } from '../data/products';
+import { mapProductResponseToProduct } from '../utils/productMapper';
 
 export const Home = () => {
-  const featuredProducts = products.filter((p) => p.featured).slice(0, 6);
+  const { accessToken } = useAuth();
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadFeatured = async () => {
+      if (!accessToken) {
+        setFeaturedProducts([]);
+        setError(null);
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await productService.list(accessToken);
+        const mapped = response.map(mapProductResponseToProduct);
+        const featured = mapped.filter((product) => product.featured).slice(0, 6);
+        setFeaturedProducts(featured);
+      } catch (err) {
+        console.error('Erro ao carregar produtos', err);
+        setError('Não foi possível carregar os livros em destaque.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadFeatured();
+  }, [accessToken]);
 
   return (
     <div>
@@ -93,21 +126,43 @@ export const Home = () => {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {featuredProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
+          {!accessToken && (
+            <div className="bg-blue-50 border border-blue-100 text-blue-700 px-6 py-4 rounded-lg text-center">
+              Faça login para visualizar os livros em destaque.
+            </div>
+          )}
 
-          <div className="mt-8 text-center md:hidden">
-            <Link
-              to="/catalog"
-              className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-semibold"
-            >
-              Ver todos os livros
-              <ArrowRight className="w-5 h-5" />
-            </Link>
-          </div>
+          {accessToken && isLoading && (
+            <p className="text-gray-500">Carregando destaques...</p>
+          )}
+
+          {accessToken && !isLoading && error && (
+            <p className="text-red-500">{error}</p>
+          )}
+
+          {accessToken && !isLoading && !error && (
+            <>
+              {featuredProducts.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {featuredProducts.map((product) => (
+                    <ProductCard key={product.id} product={product} />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500">Nenhum destaque disponível no momento.</p>
+              )}
+
+              <div className="mt-8 text-center md:hidden">
+                <Link
+                  to="/catalog"
+                  className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-semibold"
+                >
+                  Ver todos os livros
+                  <ArrowRight className="w-5 h-5" />
+                </Link>
+              </div>
+            </>
+          )}
         </div>
       </section>
 

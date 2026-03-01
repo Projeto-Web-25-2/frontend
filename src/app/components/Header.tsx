@@ -12,11 +12,16 @@ export const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     setUserMenuOpen(false);
     navigate('/');
   };
+
+  const userInitial = user?.full_name ? user.full_name.charAt(0).toUpperCase() : user?.email?.charAt(0).toUpperCase() ?? 'U';
+  const isAdmin = user?.role === 'admin';
+  const displayName = user?.full_name ?? user?.email ?? 'Usuário';
+  const roleLabel = isAdmin ? 'Administrador' : 'Cliente';
 
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
@@ -36,7 +41,7 @@ export const Header = () => {
             <Link to="/catalog" className="text-gray-700 hover:text-blue-600 transition-colors">
               Catálogo
             </Link>
-            {user?.isAdmin && (
+            {isAdmin && (
               <Link to="/admin" className="text-gray-700 hover:text-blue-600 transition-colors">
                 Admin
               </Link>
@@ -75,15 +80,22 @@ export const Header = () => {
                   aria-label="Menu do usuário"
                 >
                   <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-semibold text-sm">
-                    {user.name.charAt(0).toUpperCase()}
+                    {userInitial}
                   </div>
                 </button>
 
                 {userMenuOpen && (
                   <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50">
                     <div className="px-4 py-3 border-b border-gray-200">
-                      <p className="font-semibold">{user.name}</p>
+                      <p className="font-semibold">{displayName}</p>
                       <p className="text-sm text-gray-600">{user.email}</p>
+                      <span
+                        className={`inline-flex gap-1 mt-2 rounded-full  text-xs font-semibold ${
+                          isAdmin ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'
+                        }`}
+                      >
+                        {roleLabel}
+                      </span>
                     </div>
                     <Link
                       to="/my-orders"
@@ -93,7 +105,7 @@ export const Header = () => {
                       <Package className="w-4 h-4 text-gray-500" />
                       <span>Meus Pedidos</span>
                     </Link>
-                    {user.isAdmin && (
+                    {isAdmin && (
                       <Link
                         to="/admin"
                         onClick={() => setUserMenuOpen(false)}
@@ -171,7 +183,7 @@ export const Header = () => {
                 Meus Pedidos
               </Link>
             )}
-            {user?.isAdmin && (
+            {isAdmin && (
               <Link
                 to="/admin"
                 className="text-gray-700 hover:text-blue-600 transition-colors"

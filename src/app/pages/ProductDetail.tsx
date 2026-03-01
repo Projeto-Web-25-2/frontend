@@ -1,21 +1,84 @@
 import { useParams, useNavigate } from 'react-router';
-import { products } from '../data/products';
+import { useEffect, useState } from 'react';
 import { ShoppingCart, ArrowLeft, BookOpen, Package, Download } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { toast } from 'sonner';
+import type { Product } from '../data/products';
+import { mapProductResponseToProduct } from '../utils/productMapper';
+import { productService } from '../services';
+import { useAuth } from '../context/AuthContext';
 
 export const ProductDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addToCart } = useCart();
+  const { accessToken } = useAuth();
+  const [product, setProduct] = useState<Product | null>(null);
+  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const product = products.find((p) => p.id === id);
+  useEffect(() => {
+    const loadProduct = async () => {
+      if (!id) return;
+      if (!accessToken) {
+        setIsLoading(false);
+        setError('Faça login para visualizar os detalhes do produto.');
+        return;
+      }
 
-  if (!product) {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const productId = Number(id);
+        const [productResponse, productList] = await Promise.all([
+          productService.getById(productId, accessToken),
+          productService.list(accessToken),
+        ]);
+
+        const currentProduct = mapProductResponseToProduct(productResponse);
+        const mappedList = productList.map(mapProductResponseToProduct);
+        const related = mappedList
+          .filter((item) => item.id !== currentProduct.id && item.category === currentProduct.category)
+          .slice(0, 3);
+
+        setProduct(currentProduct);
+        setRelatedProducts(related);
+      } catch (err) {
+        console.error('Erro ao carregar produto', err);
+        setError('Não foi possível carregar o produto.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadProduct();
+  }, [id, accessToken]);
+
+  const handleAddToCart = async () => {
+    if (!product) return;
+    try {
+      await addToCart(product);
+      toast.success(`${product.title} adicionado ao carrinho!`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao adicionar ao carrinho.';
+      toast.error(message);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-gray-600">Carregando produto...</p>
+      </div>
+    );
+  }
+
+  if (error || !product) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Produto não encontrado</h2>
+          <h2 className="text-2xl font-bold mb-4">{error ?? 'Produto não encontrado'}</h2>
           <button
             onClick={() => navigate('/catalog')}
             className="text-blue-600 hover:text-blue-700"
@@ -26,15 +89,6 @@ export const ProductDetail = () => {
       </div>
     );
   }
-
-  const handleAddToCart = () => {
-    addToCart(product);
-    toast.success(`${product.title} adicionado ao carrinho!`);
-  };
-
-  const relatedProducts = products
-    .filter((p) => p.category === product.category && p.id !== product.id)
-    .slice(0, 3);
 
   return (
     <div className="min-h-screen bg-gray-50">

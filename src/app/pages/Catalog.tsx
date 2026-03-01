@@ -1,13 +1,58 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Filter, SlidersHorizontal } from 'lucide-react';
-import { products, categories } from '../data/products';
+import { categories } from '../data/products';
 import { ProductCard } from '../components/ProductCard';
+import { productService } from '../services';
+import { useAuth } from '../context/AuthContext';
+import type { Product } from '../data/products';
+import { mapProductResponseToProduct } from '../utils/productMapper';
 
 export const Catalog = () => {
+  const { accessToken } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [selectedType, setSelectedType] = useState<'all' | 'physical' | 'digital'>('all');
   const [priceRange, setPriceRange] = useState<'all' | 'under100' | '100to150' | 'over150'>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadProducts = async () => {
+      if (!accessToken) {
+        setProducts([]);
+        setError(null);
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await productService.list(accessToken);
+        setProducts(response.map(mapProductResponseToProduct));
+      } catch (err) {
+        console.error('Erro ao carregar catálogo', err);
+        setError('Não foi possível carregar o catálogo.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadProducts();
+  }, [accessToken]);
+
+  const dynamicCategories = useMemo(() => {
+    const uniqueCategories = new Set<string>();
+    products.forEach((product) => {
+      if (product.category) uniqueCategories.add(product.category);
+    });
+    return Array.from(uniqueCategories);
+  }, [products]);
+
+  const availableCategories = useMemo(() => {
+    const baseCategories = categories.filter((category) => category !== 'Todos');
+    return ['Todos', ...Array.from(new Set([...baseCategories, ...dynamicCategories]))];
+  }, [dynamicCategories]);
 
   const filteredProducts = products.filter((product) => {
     const categoryMatch = selectedCategory === 'Todos' || product.category === selectedCategory;
@@ -32,6 +77,18 @@ export const Catalog = () => {
           </p>
         </div>
 
+        {!accessToken && (
+          <div className="bg-blue-50 border border-blue-100 text-blue-700 px-6 py-4 rounded-lg mb-6">
+            Entre na sua conta para visualizar o catálogo completo.
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-red-50 border border-red-100 text-red-700 px-6 py-4 rounded-lg mb-6">
+            {error}
+          </div>
+        )}
+
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Filters Sidebar */}
           <aside className="lg:w-64 flex-shrink-0">
@@ -54,7 +111,7 @@ export const Catalog = () => {
                 <div>
                   <h3 className="font-semibold mb-3">Categoria</h3>
                   <div className="space-y-2">
-                    {categories.map((category) => (
+                    {availableCategories.map((category) => (
                       <button
                         key={category}
                         onClick={() => setSelectedCategory(category)}
@@ -157,18 +214,27 @@ export const Catalog = () => {
 
           {/* Products Grid */}
           <main className="flex-1">
-            <div className="mb-6 flex items-center justify-between">
-              <p className="text-gray-600">
-                {filteredProducts.length} {filteredProducts.length === 1 ? 'livro encontrado' : 'livros encontrados'}
-              </p>
-            </div>
-
-            {filteredProducts.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredProducts.map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
+            {!accessToken ? (
+              <div className="text-center py-16">
+                <p className="text-gray-500 text-lg">Faça login para explorar os produtos.</p>
               </div>
+            ) : isLoading ? (
+              <p className="text-gray-500">Carregando catálogo...</p>
+            ) : filteredProducts.length > 0 ? (
+              <>
+                <div className="mb-6 flex items-center justify-between">
+                  <p className="text-gray-600">
+                    {filteredProducts.length}{' '}
+                    {filteredProducts.length === 1 ? 'livro encontrado' : 'livros encontrados'}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredProducts.map((product) => (
+                    <ProductCard key={product.id} product={product} />
+                  ))}
+                </div>
+              </>
             ) : (
               <div className="text-center py-16">
                 <p className="text-gray-500 text-lg">
