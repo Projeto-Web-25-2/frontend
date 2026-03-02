@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useCart } from '../context/CartContext';
 import { useNavigate } from 'react-router';
-import { CreditCard, Smartphone, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { CreditCard, Smartphone, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { orderService } from '../services';
+import { useMercadoPago } from '../hooks/useMercadoPago';
 
 export const Checkout = () => {
   const { items, totalPrice, clearCart } = useCart();
@@ -20,6 +21,7 @@ export const Checkout = () => {
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [finalAmount, setFinalAmount] = useState<number>(0);
+  const { createMercadoPagoCheckout } = useMercadoPago();
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -83,9 +85,44 @@ export const Checkout = () => {
     const order = await orderService.create(user.uid, payload, accessToken);
     setOrderNumber(order.order_number);
     setFinalAmount(order.total ?? totalWithShipping);
-    await clearCart();
+    sessionStorage.setItem('lastOrderNumber', order.order_number);
+    sessionStorage.setItem('lastOrderTotal', String(order.total ?? totalWithShipping));
     sessionStorage.removeItem('shippingData');
-  }, [user, accessToken, shippingData, items, shippingCost, totalWithShipping, clearCart]);
+    return order;
+  }, [user, accessToken, shippingData, items, shippingCost, totalWithShipping]);
+
+  const handleMercadoPagoPayment = async () => {
+    if (!user || !accessToken) {
+      toast.error('Faça login para finalizar o pedido.');
+      return;
+    }
+
+    if (!shippingData?.addressUid) {
+      toast.error('Selecione um endereço de entrega antes de pagar.');
+      return;
+    }
+
+    if (items.length === 0) {
+      toast.error('Seu carrinho está vazio.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const order = await placeOrder();
+      await clearCart();
+      await createMercadoPagoCheckout({
+        testeId: order?.order_number ?? String(order?.id ?? ''),
+        userEmail: user.email,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Não foi possível iniciar o pagamento.';
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -335,15 +372,12 @@ export const Checkout = () => {
               </div>
 
               <button
-                type="submit"
+                type="button"
                 disabled={isSubmitting}
+                onClick={handleMercadoPagoPayment}
                 className="w-full bg-blue-600 text-white px-6 py-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors text-lg disabled:opacity-50"
               >
-                {paymentMethod === 'pix'
-                  ? 'Gerar Código PIX'
-                  : isSubmitting
-                  ? 'Processando...'
-                  : 'Confirmar Pagamento'}
+                {isSubmitting ? 'Redirecionando para pagamento...' : 'Pagar com Mercado Pago'}
               </button>
             </form>
           </div>

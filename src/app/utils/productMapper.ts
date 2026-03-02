@@ -3,6 +3,24 @@ import type { ProductResponse, ProductType } from '../services';
 
 const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=600&h=800&fit=crop&auto=format&dpr=2';
 
+const toNumber = (value?: string | number | null) => {
+  if (value === undefined || value === null) return undefined;
+  const parsed = typeof value === 'number' ? value : Number(value.replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const parseDimensions = (raw?: string | null) => {
+  if (!raw) return {};
+  const matches = raw.match(/[\d.,]+/g);
+  if (!matches) return {};
+  const [length, width, height] = matches.slice(0, 3).map((value) => toNumber(value));
+  return {
+    length,
+    width,
+    height,
+  };
+};
+
 const productTypeToDisplayType = (productType: ProductType): 'physical' | 'digital' => {
   if (productType === 'ebook') return 'digital';
   return 'physical';
@@ -20,6 +38,8 @@ export const mapProductResponseToProduct = (response: ProductResponse): Product 
     }
   }
 
+  const { length, width, height } = parseDimensions(response.dimensions);
+
   return {
     id: String(response.id),
     title: response.title,
@@ -35,5 +55,11 @@ export const mapProductResponseToProduct = (response: ProductResponse): Product 
     isbn: response.isbn,
     tags: response.tags ?? [],
     featured: response.featured ?? false,
+    weight: toNumber(response.weight),
+    length,
+    width,
+    height,
+    dimensions: response.dimensions ?? undefined,
+    insuranceValue: response.price,
   };
 };

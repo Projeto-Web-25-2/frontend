@@ -81,6 +81,12 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoading(true);
     try {
       const cart = await cartService.get(user.uid, accessToken);
+
+      // Evita sobrescrever um carrinho já populado com uma resposta vazia atrasada
+      if (cart.items.length === 0 && items.length > 0) {
+        return;
+      }
+
       await hydrateCart(cart);
     } catch (error) {
       console.error('Erro ao carregar carrinho', error);
@@ -88,7 +94,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } finally {
       setIsLoading(false);
     }
-  }, [user, accessToken, hydrateCart]);
+  }, [user, accessToken, hydrateCart, items.length]);
 
   useEffect(() => {
     refreshCart();

@@ -475,7 +475,86 @@ Prefixo backend: `/api/v1/admin`
     - `unit_price`: number
 
 ---
+## 7. Frete / Correios (admin e user)
 
+Prefixo backend: `/api/v1/shipping`
+
+### 7.1 GET /api/v1/shipping/address/{cep}
+
+- **Auth**: access token (roles: `admin`, `user`)
+- **URL Params**:
+  - `cep`: string (CEP, pode ter ou não máscara, ex: "01310-100" ou "01310100")
+- **Resposta (200)** – `ViaCepAddressDTO`:
+  - `postal_code`: string (CEP normalizado)
+  - `street`: string
+  - `neighborhood`: string
+  - `city`: string
+  - `state`: string (UF)
+
+---
+
+### 7.2 POST /api/v1/shipping/quotes
+
+- **Auth**: access token (roles: `admin`, `user`)
+- **Body (JSON)** `ShippingCalculateRequestDTO`:
+  - `origin_postal_code`: string (CEP de origem)
+  - `destination_postal_code`: string (CEP de destino)
+  - `products`: array de objetos `ShippingProductDTO`:
+    - `id`: string (identificador do produto, ex: SKU)
+    - `width`: number
+    - `height`: number
+    - `length`: number
+    - `weight`: number
+    - `insurance_value`: number (valor segurado)
+    - `quantity`: number
+- **Resposta (200)** – lista de cotações `ShippingQuoteDTO[]`:
+  - Estrutura flexível (vem direto do Melhor Envio), mas tipicamente inclui campos como:
+    - `id?`: string
+    - `name?`: string (nome do serviço, ex: "PAC", "SEDEX")
+    - `price?`: number
+    - `final_price?`: number
+    - `custom_price?`: number
+    - `company?`: objeto com dados da transportadora
+    - `delivery_time?`: objeto com prazo estimado
+
+## 8. Pagamentos Mercado Pago
+
+Prefixo backend: `/api/v1/mercado-pago`
+
+### 8.1 POST /api/v1/mercado-pago/create-checkout
+
+- **Auth**: access token (roles: `admin`, `user`)
+- **Body (JSON)**:
+  - `testeId`: string (identificador do teste/pedido que o backend vai usar)
+  - `userEmail?`: string (opcional, email do usuário para o Mercado Pago)
+- **Resposta (200)**:
+  - `preferenceId`: string (ID da preference criada no Mercado Pago)
+  - `initPoint`: string (URL para onde o front deve redirecionar o usuário)
+
+---
+
+### 8.2 GET /api/v1/mercado-pago/pending
+
+- **Auth**: pública (chamado pelo redirecionamento do Mercado Pago)
+- **Query Params** (enviados pelo MP):
+  - `payment_id`: string (ID do pagamento no Mercado Pago)
+  - `external_reference`: string (testeId enviado na criação da preference)
+- **Comportamento**:
+  - Consulta o pagamento no MP; se estiver `approved`, redireciona para `FRONTEND_URL/?status=sucesso`.
+  - Caso contrário, redireciona para `FRONTEND_URL/`.
+
+---
+
+### 8.3 POST /api/v1/mercado-pago/webhook
+
+- **Auth**: pública, mas com **verificação de assinatura**:
+  - Requer headers `x-signature` e `x-request-id` válidos, verificados via HMAC SHA256 com `MERCADO_PAGO_WEBHOOK_SECRET`.
+- **Body (JSON)**: payload enviado pelo Mercado Pago (eventos de pagamento).
+- **Comportamento**:
+  - Ignora eventos cujo `type` não seja `"payment"`.
+  - Para eventos de pagamento, busca os dados completos (`payment_id`) e, se aprovado, chama internamente `handle_mercadopago_payment` (onde você marca o pedido como pago, etc.).
+- **Resposta (200)**:
+  - `{ "received": true }`
 ## Observações para o Front
 
 - Sempre envie `Authorization: Bearer <access_token>` nas rotas protegidas.

@@ -9,6 +9,12 @@ export interface Product {
   description: string;
   image: string;
   stock: number;
+  weight?: number;
+  width?: number;
+  height?: number;
+  length?: number;
+  dimensions?: string;
+  insuranceValue?: number;
   pages?: number;
   isbn?: string;
   tags: string[];

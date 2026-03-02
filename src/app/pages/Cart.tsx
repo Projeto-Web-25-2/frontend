@@ -165,8 +165,6 @@ export const Cart = () => {
                 </div>
                 {shippingCost > 0 && (
                   <div className="flex justify-between text-gray-700">
-                    <span>Frete</span>
-                    <span>R$ {shippingCost.toFixed(2)}</span>
                   </div>
                 )}
                 <div className="border-t border-gray-200 pt-3">
@@ -197,7 +195,7 @@ export const Cart = () => {
                 <p className="text-sm text-gray-600">
                   <strong>📦 Entrega:</strong>
                   {items.some((item) => item.type === 'physical')
-                    ? ' Livros físicos em até 7 dias úteis.'
+                    ? ' Livros físicos em até infinito dias úteis.'
                     : ''}
                   {items.some((item) => item.type === 'digital')
                     ? ' E-books disponíveis imediatamente após pagamento.'

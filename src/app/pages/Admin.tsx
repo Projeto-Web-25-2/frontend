@@ -237,6 +237,7 @@ export const Admin = () => {
     const priceNumber = Number(newProduct.price);
     const stockNumber = Number(newProduct.stock);
     const pagesNumber = newProduct.pages ? Number(newProduct.pages) : undefined;
+    const categoryValue = newProduct.category.trim();
 
     if (!Number.isFinite(priceNumber) || priceNumber <= 0) {
       toast.error('Informe um preço válido.');
@@ -245,6 +246,11 @@ export const Admin = () => {
 
     if (!Number.isFinite(stockNumber) || stockNumber < 0) {
       toast.error('Informe um estoque válido.');
+      return;
+    }
+
+    if (!categoryValue) {
+      toast.error('Selecione uma categoria para o produto.');
       return;
     }
 
@@ -258,7 +264,7 @@ export const Admin = () => {
         stock: stockNumber,
         product_type: PRODUCT_TYPE_PAYLOAD_MAP[newProduct.type],
         author: newProduct.author.trim() || undefined,
-        category: newProduct.category || undefined,
+        category: categoryValue,
         isbn: newProduct.isbn.trim() || undefined,
         num_pages: pagesNumber,
         image_url: newProduct.image.trim() || undefined,

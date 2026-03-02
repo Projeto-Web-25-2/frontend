@@ -6,3 +6,5 @@ export * from './productService';
 export * from './orderService';
 export * from './cartService';
 export * from './adminService';
+export * from './shippingService';
+export * from './mercadoPagoService';

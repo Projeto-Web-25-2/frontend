@@ -211,10 +211,6 @@ export const MyOrders = () => {
                               Download
                             </button>
                           )}
-                          <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm">
-                            <Eye className="w-4 h-4" />
-                            Ver Detalhes
-                          </button>
                         </div>
                       </div>
                     </div>
