@@ -48,8 +48,6 @@ export const Checkout = () => {
       throw new Error('Seu carrinho está vazio.');
     }
 
-    const grossTotal = totalPrice + shippingCost;
-
     const payload = {
       address_uid: shippingData.addressUid,
       items: items.map((item) => ({
@@ -57,8 +55,8 @@ export const Checkout = () => {
         quantity: item.quantity,
       })),
       shipping: shippingCost,
-      // Desconto de 100% do valor (apenas POC, não cobra nada)
-      discount: grossTotal,
+      // Sem desconto no backend para evitar unit_price = 0 no Mercado Pago
+      discount: 0,
       note: shippingData?.personalInfo?.note || null,
     };
 

@@ -9,7 +9,7 @@ export const Cart = () => {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  const shippingCost = items.some((item) => item.type === 'physical') ? 15.0 : 0;
+  const shippingCost = 0;
   const totalWithShipping = totalPrice + shippingCost;
 
   const handleQuantityChange = async (cartItemId: number, quantity: number) => {
