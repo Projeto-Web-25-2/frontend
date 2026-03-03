@@ -35,7 +35,12 @@ export const Checkout = () => {
     }
   }, [isAuthenticated, user, items, navigate]);
 
-  const shippingCost = shippingData?.shippingOption?.price || shippingData?.shippingOption?.final_price || 0;
+  const shippingCost = Number(
+    shippingData?.shippingOption?.price ??
+      shippingData?.shippingOption?.final_price ??
+      shippingData?.shippingOption?.custom_price ??
+      0
+  );
   const totalWithShipping = totalPrice + shippingCost;
 
   const handleMercadoPagoCheckout = async () => {

@@ -2,3 +2,4 @@ node_modules/
 guidelines/
 .env.development
 .env
+.env.production

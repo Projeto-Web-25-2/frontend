@@ -448,7 +448,11 @@ export const Shipping = () => {
                         </div>
                       </div>
                       <div className="font-semibold text-blue-600">
-                        R$ {(option.price || option.final_price || option.custom_price || 0).toFixed(2)}
+                        R$
+                        {" "}
+                        {Number(
+                          option.price ?? option.final_price ?? option.custom_price ?? 0
+                        ).toFixed(2)}
                       </div>
                     </label>
                   ))}
@@ -469,7 +473,14 @@ export const Shipping = () => {
                 <div className="flex justify-between">
                   <span>Frete</span>
                   <span>
-                    R$ {(shippingOptions[selectedShipping].price || shippingOptions[selectedShipping].final_price || 0).toFixed(2)}
+                    R$
+                    {" "}
+                    {Number(
+                      shippingOptions[selectedShipping].price ??
+                        shippingOptions[selectedShipping].final_price ??
+                        shippingOptions[selectedShipping].custom_price ??
+                        0
+                    ).toFixed(2)}
                   </span>
                 </div>
               )}
@@ -480,7 +491,12 @@ export const Shipping = () => {
                   {(
                     totalPrice +
                     (selectedShipping !== -1 && shippingOptions[selectedShipping]
-                      ? (shippingOptions[selectedShipping].price || shippingOptions[selectedShipping].final_price || 0)
+                      ? Number(
+                          shippingOptions[selectedShipping].price ??
+                            shippingOptions[selectedShipping].final_price ??
+                            shippingOptions[selectedShipping].custom_price ??
+                            0
+                        )
                       : 0)
                   ).toFixed(2)}
                 </span>
