@@ -22,10 +22,9 @@ export const SignIn = () => {
     setLoading(true);
     try {
       await login(email, password);
-      toast.success('Login realizado com sucesso!');
       navigate('/');
     } catch (error) {
-      toast.error('Erro ao fazer login. Verifique suas credenciais.');
+      // Error already handled by AuthContext
     } finally {
       setLoading(false);
     }
@@ -95,12 +94,9 @@ export const SignIn = () => {
 
         {/* Demo Credentials */}
         <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <p className="text-sm text-blue-800 font-semibold mb-2">🔐 Credenciais de Teste:</p>
+          <p className="text-sm text-blue-800 font-semibold mb-2">ℹ️ Informação:</p>
           <p className="text-xs text-blue-700">
-            <strong>Admin:</strong> admin@compia.com.br / admin123
-          </p>
-          <p className="text-xs text-blue-700">
-            <strong>Cliente:</strong> qualquer email / qualquer senha
+            Use suas credenciais reais da API para fazer login.
           </p>
         </div>
 

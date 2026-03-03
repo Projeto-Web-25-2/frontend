@@ -1,84 +1,79 @@
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { useEffect, useState } from 'react';
-import { ShoppingCart, ArrowLeft, BookOpen, Package, Download } from 'lucide-react';
+import { ShoppingCart, ArrowLeft, BookOpen, Package, Download, Loader } from 'lucide-react';
 import { useCart } from '../context/CartContext';
-import { toast } from 'sonner';
-import type { Product } from '../data/products';
-import { mapProductResponseToProduct } from '../utils/productMapper';
-import { productService } from '../services';
 import { useAuth } from '../context/AuthContext';
+import { api, Product } from '../services/api';
+import { toast } from 'sonner';
 
 export const ProductDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addToCart } = useCart();
-  const { accessToken } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [product, setProduct] = useState<Product | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadProduct = async () => {
-      if (!id) return;
-      if (!accessToken) {
-        setIsLoading(false);
-        setError('Faça login para visualizar os detalhes do produto.');
-        return;
-      }
+    if (!id) {
+      navigate('/catalog');
+      return;
+    }
 
-      setIsLoading(true);
-      setError(null);
-      try {
-        const productId = Number(id);
-        const [productResponse, productList] = await Promise.all([
-          productService.getById(productId, accessToken),
-          productService.list(accessToken),
-        ]);
+    loadProduct(parseInt(id));
+  }, [id, navigate]);
 
-        const currentProduct = mapProductResponseToProduct(productResponse);
-        const mappedList = productList.map(mapProductResponseToProduct);
-        const related = mappedList
-          .filter((item) => item.id !== currentProduct.id && item.category === currentProduct.category)
-          .slice(0, 3);
-
-        setProduct(currentProduct);
-        setRelatedProducts(related);
-      } catch (err) {
-        console.error('Erro ao carregar produto', err);
-        setError('Não foi possível carregar o produto.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadProduct();
-  }, [id, accessToken]);
-
-  const handleAddToCart = async () => {
-    if (!product) return;
+  const loadProduct = async (productId: number) => {
     try {
-      await addToCart(product);
-      toast.success(`${product.title} adicionado ao carrinho!`);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erro ao adicionar ao carrinho.';
-      toast.error(message);
+      setLoading(true);
+      const data = await api.getProduct(productId);
+      setProduct(data);
+
+      // Load related products
+      const allProducts = await api.getProducts();
+      const related = allProducts
+        .filter((p) => p.category === data.category && p.id !== data.id && p.active)
+        .slice(0, 3);
+      setRelatedProducts(related);
+    } catch (error) {
+      console.error('Error loading product:', error);
+      toast.error('Produto não encontrado');
+      navigate('/catalog');
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (isLoading) {
+  const handleAddToCart = async () => {
+    if (!isAuthenticated) {
+      toast.error('Faça login para adicionar ao carrinho');
+      navigate('/signin');
+      return;
+    }
+
+    if (!product) return;
+
+    try {
+      await addToCart(product, 1);
+    } catch (error) {
+      // Error already handled in context
+    }
+  };
+
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-600">Carregando produto...</p>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader className="w-12 h-12 animate-spin text-blue-600" />
       </div>
     );
   }
 
-  if (error || !product) {
+  if (!product) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">{error ?? 'Produto não encontrado'}</h2>
+          <h2 className="text-2xl font-bold mb-4">Produto não encontrado</h2>
           <button
             onClick={() => navigate('/catalog')}
             className="text-blue-600 hover:text-blue-700"
@@ -103,123 +98,169 @@ export const ProductDetail = () => {
         </button>
 
         {/* Product Details */}
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8">
-            {/* Image */}
-            <div>
+        <div className="bg-white rounded-lg shadow-lg overflow-hidden mb-12">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-8">
+            {/* Product Image */}
+            <div className="relative">
               <img
-                src={product.image}
+                src={
+                  product.image ||
+                  'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=600&h=800&fit=crop'
+                }
                 alt={product.title}
-                className="w-full rounded-lg shadow-lg"
+                className="w-full h-auto rounded-lg shadow-md"
               />
+              {product.discount_percent && product.discount_percent > 0 && (
+                <div className="absolute top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg font-semibold">
+                  {product.discount_percent}% OFF
+                </div>
+              )}
+              {!product.active && (
+                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-lg">
+                  <span className="text-white text-2xl font-semibold">Indisponível</span>
+                </div>
+              )}
             </div>
 
-            {/* Info */}
+            {/* Product Info */}
             <div>
-              <div className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium mb-4">
-                {product.category}
-              </div>
-              <h1 className="text-4xl font-bold mb-4">{product.title}</h1>
-              <p className="text-xl text-gray-600 mb-6">por {product.author}</p>
-
-              <div className="flex items-end gap-4 mb-6">
-                {product.originalPrice && (
-                  <span className="text-2xl text-gray-400 line-through">
-                    R$ {product.originalPrice.toFixed(2)}
-                  </span>
-                )}
-                <span className="text-4xl font-bold text-blue-600">
-                  R$ {product.price.toFixed(2)}
+              <div className="mb-4">
+                <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-full">
+                  {product.category}
                 </span>
-                {product.originalPrice && (
-                  <span className="bg-red-500 text-white px-2 py-1 rounded text-sm font-semibold">
-                    {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF
-                  </span>
-                )}
+                <span className="inline-block ml-2 px-3 py-1 bg-gray-100 text-gray-800 text-sm font-semibold rounded-full">
+                  {product.product_type === 'ebook' ? 'E-book' : 'Livro Físico'}
+                </span>
               </div>
 
-              <p className="text-gray-700 mb-6 leading-relaxed">{product.description}</p>
+              <h1 className="text-4xl font-bold mb-4">{product.title}</h1>
 
-              {/* Details */}
-              <div className="space-y-3 mb-8">
-                <div className="flex items-center gap-3 text-gray-700">
-                  {product.type === 'digital' ? (
-                    <Download className="w-5 h-5 text-blue-600" />
-                  ) : (
-                    <Package className="w-5 h-5 text-blue-600" />
-                  )}
-                  <span>{product.type === 'digital' ? 'E-book Digital' : 'Livro Físico'}</span>
+              {product.author && (
+                <p className="text-xl text-gray-600 mb-6">por {product.author}</p>
+              )}
+
+              <div className="mb-6">
+                <div className="text-4xl font-bold text-blue-600 mb-2">
+                  R$ {product.price.toFixed(2)}
                 </div>
-                <div className="flex items-center gap-3 text-gray-700">
-                  <BookOpen className="w-5 h-5 text-blue-600" />
-                  <span>{product.pages} páginas</span>
-                </div>
-                {product.isbn && (
-                  <div className="flex items-center gap-3 text-gray-700">
-                    <span className="font-semibold">ISBN:</span>
-                    <span>{product.isbn}</span>
+                {product.discount_percent && product.discount_percent > 0 && (
+                  <div className="text-lg text-gray-400 line-through">
+                    R${' '}
+                    {(product.price / (1 - product.discount_percent / 100)).toFixed(2)}
                   </div>
                 )}
               </div>
 
-              {/* Stock */}
-              {product.type === 'physical' && (
+              <div className="mb-6">
+                <h3 className="font-semibold mb-2">Descrição</h3>
+                <p className="text-gray-700 leading-relaxed">{product.description}</p>
+              </div>
+
+              {/* Product Details */}
+              <div className="space-y-3 mb-8">
+                {product.isbn && (
+                  <div className="flex items-center gap-3">
+                    <BookOpen className="w-5 h-5 text-gray-400" />
+                    <span className="text-gray-700">ISBN: {product.isbn}</span>
+                  </div>
+                )}
+                {product.publisher && (
+                  <div className="flex items-center gap-3">
+                    <Package className="w-5 h-5 text-gray-400" />
+                    <span className="text-gray-700">Editora: {product.publisher}</span>
+                  </div>
+                )}
+                {product.pub_year && (
+                  <div className="flex items-center gap-3">
+                    <Package className="w-5 h-5 text-gray-400" />
+                    <span className="text-gray-700">Ano: {product.pub_year}</span>
+                  </div>
+                )}
+                {product.num_pages && (
+                  <div className="flex items-center gap-3">
+                    <BookOpen className="w-5 h-5 text-gray-400" />
+                    <span className="text-gray-700">{product.num_pages} páginas</span>
+                  </div>
+                )}
+                {product.language && (
+                  <div className="flex items-center gap-3">
+                    <Package className="w-5 h-5 text-gray-400" />
+                    <span className="text-gray-700">Idioma: {product.language}</span>
+                  </div>
+                )}
+                {product.format && (
+                  <div className="flex items-center gap-3">
+                    <Download className="w-5 h-5 text-gray-400" />
+                    <span className="text-gray-700">
+                      Formato: {product.format.toUpperCase()}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Stock Info */}
+              {product.product_type !== 'ebook' && (
                 <div className="mb-6">
-                  {product.stock > 10 ? (
-                    <p className="text-green-600 font-medium">✓ Em estoque</p>
-                  ) : product.stock > 0 ? (
-                    <p className="text-orange-600 font-medium">
-                      Apenas {product.stock} unidades disponíveis
-                    </p>
+                  {product.stock > 0 ? (
+                    product.stock < 10 ? (
+                      <div className="text-orange-600 font-semibold">
+                        Apenas {product.stock} unidades em estoque
+                      </div>
+                    ) : (
+                      <div className="text-green-600 font-semibold">Em estoque</div>
+                    )
                   ) : (
-                    <p className="text-red-600 font-medium">Fora de estoque</p>
+                    <div className="text-red-600 font-semibold">Fora de estoque</div>
                   )}
                 </div>
               )}
 
-              {/* Tags */}
-              <div className="flex flex-wrap gap-2 mb-8">
-                {product.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-4">
-                <button
-                  onClick={handleAddToCart}
-                  disabled={product.type === 'physical' && product.stock === 0}
-                  className="flex-1 bg-blue-600 text-white px-6 py-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  <ShoppingCart className="w-5 h-5" />
-                  Adicionar ao Carrinho
-                </button>
-              </div>
+              {/* Add to Cart Button */}
+              <button
+                onClick={handleAddToCart}
+                disabled={!product.active || (product.product_type !== 'ebook' && product.stock === 0)}
+                className="w-full bg-blue-600 text-white py-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-lg"
+              >
+                <ShoppingCart className="w-6 h-6" />
+                {product.active
+                  ? product.product_type === 'ebook' || product.stock > 0
+                    ? 'Adicionar ao Carrinho'
+                    : 'Fora de Estoque'
+                  : 'Produto Indisponível'}
+              </button>
             </div>
           </div>
         </div>
 
         {/* Related Products */}
         {relatedProducts.length > 0 && (
-          <div className="mt-16">
-            <h2 className="text-2xl font-bold mb-6">Livros Relacionados</h2>
+          <div>
+            <h2 className="text-2xl font-bold mb-6">Produtos Relacionados</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {relatedProducts.map((p) => (
+              {relatedProducts.map((relatedProduct) => (
                 <div
-                  key={p.id}
-                  onClick={() => navigate(`/product/${p.id}`)}
+                  key={relatedProduct.id}
+                  onClick={() => navigate(`/product/${relatedProduct.id}`)}
                   className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer hover:shadow-xl transition-shadow"
                 >
-                  <img src={p.image} alt={p.title} className="w-full h-48 object-cover" />
+                  <img
+                    src={
+                      relatedProduct.image ||
+                      'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=600&h=800&fit=crop'
+                    }
+                    alt={relatedProduct.title}
+                    className="w-full h-64 object-cover"
+                  />
                   <div className="p-4">
-                    <h3 className="font-semibold mb-2 line-clamp-2">{p.title}</h3>
-                    <p className="text-sm text-gray-600 mb-2">{p.author}</p>
-                    <p className="text-lg font-bold text-blue-600">R$ {p.price.toFixed(2)}</p>
+                    <h3 className="font-semibold text-lg mb-1 line-clamp-2">
+                      {relatedProduct.title}
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-2">
+                      {relatedProduct.author || 'Autor desconhecido'}
+                    </p>
+                    <div className="text-xl font-bold text-blue-600">
+                      R$ {relatedProduct.price.toFixed(2)}
+                    </div>
                   </div>
                 </div>
               ))}

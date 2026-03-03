@@ -1,31 +1,25 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  ReactNode,
-  useEffect,
-  useCallback,
-} from 'react';
-import { Product } from '../data/products';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { api, Product, Cart as ApiCart } from '../services/api';
 import { useAuth } from './AuthContext';
-import { cartService, productService, type CartResponse } from '../services';
-import { mapProductResponseToProduct } from '../utils/productMapper';
+import { toast } from 'sonner';
 
-interface CartItem extends Product {
+interface CartItem {
+  id: number;
+  product_id: number;
   quantity: number;
-  cartItemId: number;
+  product?: Product;
 }
 
 interface CartContextType {
   items: CartItem[];
-  isLoading: boolean;
   addToCart: (product: Product, quantity?: number) => Promise<void>;
-  removeFromCart: (cartItemId: number) => Promise<void>;
-  updateQuantity: (cartItemId: number, quantity: number) => Promise<void>;
+  removeFromCart: (itemId: number) => Promise<void>;
+  updateQuantity: (itemId: number, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
-  refreshCart: () => Promise<void>;
   totalItems: number;
   totalPrice: number;
+  loading: boolean;
+  refreshCart: () => Promise<void>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -38,134 +32,144 @@ export const useCart = () => {
   return context;
 };
 
-const buildCartItems = async (
-  cart: CartResponse,
-  accessToken: string
-): Promise<CartItem[]> => {
-  const detailedItems = await Promise.all(
-    cart.items.map(async (item) => {
-      const productResponse = await productService.getById(item.product_id, accessToken);
-      const product = mapProductResponseToProduct(productResponse);
-      return {
-        ...product,
-        quantity: item.quantity,
-        cartItemId: item.id,
-      };
-    })
-  );
-
-  return detailedItems;
-};
-
 export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { user, isAuthenticated } = useAuth();
   const [items, setItems] = useState<CartItem[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const { user, accessToken } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [products, setProducts] = useState<{ [key: number]: Product }>({});
 
-  const hydrateCart = useCallback(
-    async (cart: CartResponse) => {
-      if (!accessToken) return;
-      const detailedItems = await buildCartItems(cart, accessToken);
-      setItems(detailedItems);
-    },
-    [accessToken]
-  );
-
-  const refreshCart = useCallback(async () => {
-    if (!user || !accessToken) {
+  // Load cart from API when user logs in
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      loadCart();
+    } else {
       setItems([]);
-      setIsLoading(false);
+    }
+  }, [isAuthenticated, user]);
+
+  const loadCart = async () => {
+    if (!user) return;
+
+    try {
+      setLoading(true);
+      const cart = await api.getCart(user.uid);
+      setItems(cart.items || []);
+
+      // Load product details for cart items
+      if (cart.items && cart.items.length > 0) {
+        const allProducts = await api.getProducts();
+        const productsMap: { [key: number]: Product } = {};
+        allProducts.forEach((p) => {
+          productsMap[p.id] = p;
+        });
+        setProducts(productsMap);
+      }
+    } catch (error) {
+      console.error('Error loading cart:', error);
+      // Don't show error toast on initial load
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const refreshCart = async () => {
+    await loadCart();
+  };
+
+  const addToCart = async (product: Product, quantity: number = 1) => {
+    if (!user) {
+      toast.error('Faça login para adicionar produtos ao carrinho');
       return;
     }
 
-    setIsLoading(true);
     try {
-      const cart = await cartService.get(user.uid, accessToken);
-
-      // Evita sobrescrever um carrinho já populado com uma resposta vazia atrasada
-      if (cart.items.length === 0 && items.length > 0) {
-        return;
-      }
-
-      await hydrateCart(cart);
-    } catch (error) {
-      console.error('Erro ao carregar carrinho', error);
-      setItems([]);
+      setLoading(true);
+      const cart = await api.addToCart(user.uid, product.id, quantity);
+      setItems(cart.items || []);
+      setProducts((prev) => ({ ...prev, [product.id]: product }));
+      toast.success('Produto adicionado ao carrinho!');
+    } catch (error: any) {
+      console.error('Error adding to cart:', error);
+      toast.error(error.message || 'Erro ao adicionar produto ao carrinho');
+      throw error;
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  }, [user, accessToken, hydrateCart, items.length]);
+  };
 
-  useEffect(() => {
-    refreshCart();
-  }, [refreshCart]);
+  const removeFromCart = async (itemId: number) => {
+    if (!user) return;
 
-  const addToCart = useCallback(
-    async (product: Product, quantity = 1) => {
-      if (!user || !accessToken) {
-        throw new Error('É necessário estar autenticado para adicionar itens ao carrinho.');
-      }
+    try {
+      setLoading(true);
+      await api.removeCartItem(user.uid, itemId);
+      setItems((prev) => prev.filter((item) => item.id !== itemId));
+      toast.success('Produto removido do carrinho');
+    } catch (error: any) {
+      console.error('Error removing from cart:', error);
+      toast.error(error.message || 'Erro ao remover produto do carrinho');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      const payload = {
-        product_id: Number(product.id),
-        quantity,
-      };
+  const updateQuantity = async (itemId: number, quantity: number) => {
+    if (!user) return;
 
-      const updatedCart = await cartService.addItem(user.uid, payload, accessToken);
-      await hydrateCart(updatedCart);
-    },
-    [user, accessToken, hydrateCart]
-  );
+    if (quantity <= 0) {
+      await removeFromCart(itemId);
+      return;
+    }
 
-  const removeFromCart = useCallback(
-    async (cartItemId: number) => {
-      if (!user || !accessToken) return;
-      await cartService.deleteItem(user.uid, cartItemId, accessToken);
-      await refreshCart();
-    },
-    [user, accessToken, refreshCart]
-  );
+    try {
+      setLoading(true);
+      const cart = await api.updateCartItem(user.uid, itemId, quantity);
+      setItems(cart.items || []);
+    } catch (error: any) {
+      console.error('Error updating quantity:', error);
+      toast.error(error.message || 'Erro ao atualizar quantidade');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const updateQuantity = useCallback(
-    async (cartItemId: number, quantity: number) => {
-      if (!user || !accessToken) return;
-      if (quantity <= 0) {
-        await removeFromCart(cartItemId);
-        return;
-      }
+  const clearCart = async () => {
+    if (!user) return;
 
-      const updatedCart = await cartService.updateItem(
-        user.uid,
-        cartItemId,
-        { quantity },
-        accessToken
-      );
-      await hydrateCart(updatedCart);
-    },
-    [user, accessToken, hydrateCart, removeFromCart]
-  );
-
-  const clearCart = useCallback(async () => {
-    if (!user || !accessToken) return;
-    const emptyCart = await cartService.clear(user.uid, accessToken);
-    await hydrateCart(emptyCart);
-  }, [user, accessToken, hydrateCart]);
+    try {
+      setLoading(true);
+      await api.clearCart(user.uid);
+      setItems([]);
+      toast.success('Carrinho limpo');
+    } catch (error: any) {
+      console.error('Error clearing cart:', error);
+      toast.error(error.message || 'Erro ao limpar carrinho');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
-  const totalPrice = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const totalPrice = items.reduce((sum, item) => {
+    const product = products[item.product_id];
+    return sum + (product ? product.price * item.quantity : 0);
+  }, 0);
 
   return (
     <CartContext.Provider
       value={{
         items,
-        isLoading,
         addToCart,
         removeFromCart,
         updateQuantity,
         clearCart,
-        refreshCart,
         totalItems,
         totalPrice,
+        loading,
+        refreshCart,
       }}
     >
       {children}

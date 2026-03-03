@@ -7,18 +7,39 @@ import { toast } from 'sonner';
 export const SignUp = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [cpf, setCpf] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [cpf, setCpf] = useState('');
   const [loading, setLoading] = useState(false);
   const { signup } = useAuth();
   const navigate = useNavigate();
 
+  const formatCPF = (value: string) => {
+    const cleaned = value.replace(/\D/g, '');
+    if (cleaned.length <= 11) {
+      return cleaned
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    }
+    return cpf;
+  };
+
+  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCpf(formatCPF(e.target.value));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!name || !email || !password || !confirmPassword || !cpf) {
+    if (!name || !email || !cpf || !password || !confirmPassword) {
       toast.error('Por favor, preencha todos os campos');
+      return;
+    }
+
+    const cleanCpf = cpf.replace(/\D/g, '');
+    if (cleanCpf.length !== 11) {
+      toast.error('CPF inválido');
       return;
     }
 
@@ -34,11 +55,10 @@ export const SignUp = () => {
 
     setLoading(true);
     try {
-      await signup(name, email, password, cpf);
-      toast.success('Conta criada com sucesso!');
+      await signup(name, email, cleanCpf, password);
       navigate('/');
     } catch (error) {
-      toast.error('Erro ao criar conta. Tente novamente.');
+      // Error already handled by AuthContext
     } finally {
       setLoading(false);
     }
@@ -89,6 +109,23 @@ export const SignUp = () => {
             </div>
           </div>
 
+          {/* CPF */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">CPF</label>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                value={cpf}
+                onChange={handleCpfChange}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="000.000.000-00"
+                maxLength={14}
+                disabled={loading}
+              />
+            </div>
+          </div>
+
           {/* Password */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Senha</label>
@@ -100,22 +137,6 @@ export const SignUp = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="••••••••"
-                disabled={loading}
-              />
-            </div>
-          </div>
-
-          {/* CPF */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">CPF</label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                value={cpf}
-                onChange={(e) => setCpf(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="000.000.000-00"
                 disabled={loading}
               />
             </div>

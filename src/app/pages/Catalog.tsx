@@ -1,62 +1,41 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Filter, SlidersHorizontal } from 'lucide-react';
-import { categories } from '../data/products';
+import { useState, useEffect } from 'react';
+import { Filter, SlidersHorizontal, Loader } from 'lucide-react';
 import { ProductCard } from '../components/ProductCard';
-import { productService } from '../services';
-import { useAuth } from '../context/AuthContext';
-import type { Product } from '../data/products';
-import { mapProductResponseToProduct } from '../utils/productMapper';
+import { api, Product } from '../services/api';
+import { toast } from 'sonner';
 
 export const Catalog = () => {
-  const { accessToken } = useAuth();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<string[]>(['Todos']);
   const [selectedCategory, setSelectedCategory] = useState('Todos');
-  const [selectedType, setSelectedType] = useState<'all' | 'physical' | 'digital'>('all');
+  const [selectedType, setSelectedType] = useState<'all' | 'physical_book' | 'ebook'>('all');
   const [priceRange, setPriceRange] = useState<'all' | 'under100' | '100to150' | 'over150'>('all');
   const [showFilters, setShowFilters] = useState(false);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadProducts = async () => {
-      if (!accessToken) {
-        setProducts([]);
-        setError(null);
-        return;
-      }
-
-      setIsLoading(true);
-      setError(null);
       try {
-        const response = await productService.list(accessToken);
-        setProducts(response.map(mapProductResponseToProduct));
-      } catch (err) {
-        console.error('Erro ao carregar catálogo', err);
-        setError('Não foi possível carregar o catálogo.');
+        const data = await api.getProducts();
+        setProducts(data);
+        
+        // Extract unique categories
+        const uniqueCategories = ['Todos', ...new Set(data.map(p => p.category))];
+        setCategories(uniqueCategories);
+      } catch (error: any) {
+        console.error('Error loading products:', error);
+        toast.error('Erro ao carregar produtos');
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
 
     loadProducts();
-  }, [accessToken]);
-
-  const dynamicCategories = useMemo(() => {
-    const uniqueCategories = new Set<string>();
-    products.forEach((product) => {
-      if (product.category) uniqueCategories.add(product.category);
-    });
-    return Array.from(uniqueCategories);
-  }, [products]);
-
-  const availableCategories = useMemo(() => {
-    const baseCategories = categories.filter((category) => category !== 'Todos');
-    return ['Todos', ...Array.from(new Set([...baseCategories, ...dynamicCategories]))];
-  }, [dynamicCategories]);
+  }, []);
 
   const filteredProducts = products.filter((product) => {
     const categoryMatch = selectedCategory === 'Todos' || product.category === selectedCategory;
-    const typeMatch = selectedType === 'all' || product.type === selectedType;
+    const typeMatch = selectedType === 'all' || product.product_type === selectedType;
     
     let priceMatch = true;
     if (priceRange === 'under100') priceMatch = product.price < 100;
@@ -65,6 +44,17 @@ export const Catalog = () => {
 
     return categoryMatch && typeMatch && priceMatch;
   });
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Carregando produtos...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -76,18 +66,6 @@ export const Catalog = () => {
             Explore nossa coleção completa de livros sobre Inteligência Artificial
           </p>
         </div>
-
-        {!accessToken && (
-          <div className="bg-blue-50 border border-blue-100 text-blue-700 px-6 py-4 rounded-lg mb-6">
-            Entre na sua conta para visualizar o catálogo completo.
-          </div>
-        )}
-
-        {error && (
-          <div className="bg-red-50 border border-red-100 text-red-700 px-6 py-4 rounded-lg mb-6">
-            {error}
-          </div>
-        )}
 
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Filters Sidebar */}
@@ -111,7 +89,7 @@ export const Catalog = () => {
                 <div>
                   <h3 className="font-semibold mb-3">Categoria</h3>
                   <div className="space-y-2">
-                    {availableCategories.map((category) => (
+                    {categories.map((category) => (
                       <button
                         key={category}
                         onClick={() => setSelectedCategory(category)}
@@ -140,17 +118,17 @@ export const Catalog = () => {
                       <span className="text-sm">Todos</span>
                     </button>
                     <button
-                      onClick={() => setSelectedType('physical')}
+                      onClick={() => setSelectedType('physical_book')}
                       className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                        selectedType === 'physical' ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'
+                        selectedType === 'physical_book' ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'
                       }`}
                     >
                       <span className="text-sm">Livro Físico</span>
                     </button>
                     <button
-                      onClick={() => setSelectedType('digital')}
+                      onClick={() => setSelectedType('ebook')}
                       className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                        selectedType === 'digital' ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'
+                        selectedType === 'ebook' ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'
                       }`}
                     >
                       <span className="text-sm">E-book</span>
@@ -214,27 +192,18 @@ export const Catalog = () => {
 
           {/* Products Grid */}
           <main className="flex-1">
-            {!accessToken ? (
-              <div className="text-center py-16">
-                <p className="text-gray-500 text-lg">Faça login para explorar os produtos.</p>
-              </div>
-            ) : isLoading ? (
-              <p className="text-gray-500">Carregando catálogo...</p>
-            ) : filteredProducts.length > 0 ? (
-              <>
-                <div className="mb-6 flex items-center justify-between">
-                  <p className="text-gray-600">
-                    {filteredProducts.length}{' '}
-                    {filteredProducts.length === 1 ? 'livro encontrado' : 'livros encontrados'}
-                  </p>
-                </div>
+            <div className="mb-6 flex items-center justify-between">
+              <p className="text-gray-600">
+                {filteredProducts.length} {filteredProducts.length === 1 ? 'livro encontrado' : 'livros encontrados'}
+              </p>
+            </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredProducts.map((product) => (
-                    <ProductCard key={product.id} product={product} />
-                  ))}
-                </div>
-              </>
+            {filteredProducts.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredProducts.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
             ) : (
               <div className="text-center py-16">
                 <p className="text-gray-500 text-lg">

@@ -1,65 +1,39 @@
-import { ArrowRight, Sparkles, Truck, CreditCard, BookOpen } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router';
-import { useEffect, useState } from 'react';
+import { ArrowRight, AlertCircle, Truck, CreditCard, BookOpen } from 'lucide-react';
+import { Link } from 'react-router';
 import { ProductCard } from '../components/ProductCard';
-import { productService } from '../services';
+import { api, Product } from '../services/api';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import type { Product } from '../data/products';
-import { mapProductResponseToProduct } from '../utils/productMapper';
-import { useCart } from '../context/CartContext';
-import { toast } from 'sonner';
 
 export const Home = () => {
-  const { accessToken } = useAuth();
-  const { clearCart } = useCart();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [lastUnits, setLastUnits] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { isAuthenticated } = useAuth();
+  const [lowStockProducts, setLowStockProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadLastUnits = async () => {
-      if (!accessToken) {
-        setLastUnits([]);
-        setError(null);
-        return;
-      }
-
-      setIsLoading(true);
-      setError(null);
-      try {
-        const response = await productService.list(accessToken);
-        const mapped = response.map(mapProductResponseToProduct);
-        const lowStock = mapped
-          .filter((product) => product.stock > 0 && product.stock < 5)
-          .sort((a, b) => a.stock - b.stock)
-          .slice(0, 6);
-        setLastUnits(lowStock);
-      } catch (err) {
-        console.error('Erro ao carregar produtos', err);
-        setError('Não foi possível carregar as últimas unidades.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadLastUnits();
-  }, [accessToken]);
-
-  useEffect(() => {
-    const status = searchParams.get('status');
-    if (!status) return;
-
-    if (status === 'sucesso') {
-      toast.success('Pagamento aprovado! Obrigado pela sua compra.');
-      void clearCart();
-    } else if (status === 'falha') {
-      toast.error('Pagamento não foi concluído. Tente novamente.');
+    if (isAuthenticated) {
+      loadLowStockProducts();
+    } else {
+      setLoading(false);
     }
+  }, [isAuthenticated]);
 
-    searchParams.delete('status');
-    setSearchParams(searchParams, { replace: true });
-  }, [searchParams, setSearchParams, clearCart]);
+  const loadLowStockProducts = async () => {
+    try {
+      setLoading(true);
+      const products = await api.getProducts();
+      // Filter products with low stock (less than 10 units) and sort by stock ascending
+      const lowStock = products
+        .filter((p) => p.active && p.stock > 0 && p.stock < 10)
+        .sort((a, b) => a.stock - b.stock)
+        .slice(0, 6);
+      setLowStockProducts(lowStock);
+    } catch (error) {
+      console.error('Error loading products:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div>
@@ -128,65 +102,55 @@ export const Home = () => {
         </div>
       </section>
 
-      {/* Featured Products */}
-      <section className="py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <div className="flex items-center gap-2 text-blue-600 mb-2">
-                <Sparkles className="w-5 h-5" />
-                <span className="text-sm font-semibold uppercase">Últimas unidades</span>
-              </div>
-              <h2 className="text-3xl font-bold">Ultimas unidades!!!</h2>
-            </div>
-            <Link
-              to="/catalog"
-              className="hidden md:flex items-center gap-2 text-blue-600 hover:text-blue-700 font-semibold"
-            >
-              Ver todos
-              <ArrowRight className="w-5 h-5" />
-            </Link>
-          </div>
-
-          {!accessToken && (
-            <div className="bg-blue-50 border border-blue-100 text-blue-700 px-6 py-4 rounded-lg text-center">
-              Faça login para visualizar as últimas unidades disponíveis.
-            </div>
-          )}
-
-          {accessToken && isLoading && (
-            <p className="text-gray-500">Carregando últimas unidades...</p>
-          )}
-
-          {accessToken && !isLoading && error && (
-            <p className="text-red-500">{error}</p>
-          )}
-
-          {accessToken && !isLoading && !error && (
-            <>
-              {lastUnits.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {lastUnits.map((product) => (
-                    <ProductCard key={product.id} product={product} />
-                  ))}
+      {/* Low Stock Products (Últimas Unidades) */}
+      {isAuthenticated && (
+        <section className="py-16">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <div className="flex items-center gap-2 text-red-600 mb-2">
+                  <AlertCircle className="w-5 h-5" />
+                  <span className="text-sm font-semibold uppercase">Últimas Unidades</span>
                 </div>
-              ) : (
-                <p className="text-gray-500">Nenhum livro com estoque crítico no momento.</p>
-              )}
-
-              <div className="mt-8 text-center md:hidden">
-                <Link
-                  to="/catalog"
-                  className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-semibold"
-                >
-                  Ver todos os livros
-                  <ArrowRight className="w-5 h-5" />
-                </Link>
+                <h2 className="text-3xl font-bold">Garanta o Seu Agora</h2>
               </div>
-            </>
-          )}
-        </div>
-      </section>
+              <Link
+                to="/catalog"
+                className="hidden md:flex items-center gap-2 text-blue-600 hover:text-blue-700 font-semibold"
+              >
+                Ver todos
+                <ArrowRight className="w-5 h-5" />
+              </Link>
+            </div>
+
+            {loading ? (
+              <div className="text-center py-12">
+                <p className="text-gray-500">Carregando produtos...</p>
+              </div>
+            ) : lowStockProducts.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {lowStockProducts.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-gray-500">Nenhum produto com estoque baixo no momento.</p>
+              </div>
+            )}
+
+            <div className="mt-8 text-center md:hidden">
+              <Link
+                to="/catalog"
+                className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-semibold"
+              >
+                Ver todos os livros
+                <ArrowRight className="w-5 h-5" />
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* About COMPIA */}
       <section className="py-16 bg-gray-50">

@@ -1,223 +1,202 @@
-import { useEffect, useState } from 'react';
-import { Package, Eye, Download, Truck } from 'lucide-react';
-import { useNavigate } from 'react-router';
+import { useState, useEffect } from 'react';
+import { Package, Eye, Loader, Truck, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { orderService, productService } from '../services';
-import { mapProductResponseToProduct } from '../utils/productMapper';
-import type { Product } from '../data/products';
-
-interface OrderItemView {
-  id: number;
-  quantity: number;
-  unit_price: number;
-  product: Product;
-}
-
-interface OrderView {
-  id: number;
-  order_number: string;
-  status: string;
-  created_at: string;
-  total: number;
-  shipping: number;
-  discount: number;
-  items: OrderItemView[];
-}
+import { useNavigate } from 'react-router';
+import { api, Order as ApiOrder, Product } from '../services/api';
+import { toast } from 'sonner';
 
 export const MyOrders = () => {
-  const { user, accessToken, isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const [orders, setOrders] = useState<OrderView[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [orders, setOrders] = useState<ApiOrder[]>([]);
+  const [products, setProducts] = useState<{ [key: number]: Product }>({});
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !user) {
       navigate('/signin');
+      return;
     }
-  }, [isAuthenticated, navigate]);
 
-  useEffect(() => {
-    const fetchOrders = async () => {
-      if (!user || !accessToken) return;
-      setIsLoading(true);
-      setError(null);
-      try {
-        const response = await orderService.list(user.uid, accessToken);
-        const enhanced: OrderView[] = [];
+    loadOrders();
+  }, [isAuthenticated, user, navigate]);
 
-        for (const order of response) {
-          const items: OrderItemView[] = [];
-          for (const item of order.items) {
-            try {
-              const productResponse = await productService.getById(item.product_id, accessToken);
-              const product = mapProductResponseToProduct(productResponse);
-              items.push({
-                id: item.id,
-                quantity: item.quantity,
-                unit_price: item.unit_price,
-                product,
-              });
-            } catch (productError) {
-              console.error('Erro ao carregar produto do pedido', productError);
-            }
-          }
+  const loadOrders = async () => {
+    if (!user) return;
 
-          enhanced.push({
-            id: order.id,
-            order_number: order.order_number,
-            status: order.status,
-            created_at: order.created_at,
-            total: order.total,
-            shipping: order.shipping,
-            discount: order.discount,
-            items,
-          });
-        }
+    try {
+      setLoading(true);
+      const data = await api.getOrders(user.uid);
+      setOrders(data);
 
-        setOrders(enhanced);
-      } catch (err) {
-        console.error('Erro ao carregar pedidos', err);
-        setError('Não foi possível carregar seus pedidos.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchOrders();
-  }, [user, accessToken]);
-
-  if (!user) {
-    return null;
-  }
-
-  const statusLabels: Record<string, { label: string; color: string }> = {
-    awaiting_payment: { label: 'Aguardando Pagamento', color: 'bg-yellow-100 text-yellow-800' },
-    payment_confirmed: { label: 'Pagamento Confirmado', color: 'bg-green-100 text-green-800' },
-    shipped: { label: 'Enviado', color: 'bg-blue-100 text-blue-800' },
-    delivered: { label: 'Entregue', color: 'bg-gray-100 text-gray-800' },
-    cancelled: { label: 'Cancelado', color: 'bg-red-100 text-red-800' },
+      // Load product details
+      const allProducts = await api.getProducts();
+      const productsMap: { [key: number]: Product } = {};
+      allProducts.forEach((p) => {
+        productsMap[p.id] = p;
+      });
+      setProducts(productsMap);
+    } catch (error) {
+      console.error('Error loading orders:', error);
+      toast.error('Erro ao carregar pedidos');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const getStatusBadge = (status: string) => statusLabels[status] ?? { label: status, color: 'bg-gray-100 text-gray-800' };
+  const getStatusBadge = (status: string) => {
+    const statusMap: { [key: string]: { label: string; color: string; icon: any } } = {
+      awaiting_payment: { label: 'Aguardando Pagamento', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
+      payment_confirmed: { label: 'Pagamento Confirmado', color: 'bg-green-100 text-green-800', icon: CheckCircle },
+      processing: { label: 'Em Processamento', color: 'bg-blue-100 text-blue-800', icon: Package },
+      shipped: { label: 'Enviado', color: 'bg-purple-100 text-purple-800', icon: Truck },
+      delivered: { label: 'Entregue', color: 'bg-green-100 text-green-800', icon: CheckCircle },
+      cancelled: { label: 'Cancelado', color: 'bg-red-100 text-red-800', icon: XCircle },
+    };
+
+    const statusInfo = statusMap[status] || statusMap.awaiting_payment;
+    const Icon = statusInfo.icon;
+
+    return (
+      <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold ${statusInfo.color}`}>
+        <Icon className="w-4 h-4" />
+        {statusInfo.label}
+      </div>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Carregando pedidos...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">Meus Pedidos</h1>
-          <p className="text-gray-600">Acompanhe o status dos seus pedidos</p>
-        </div>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h1 className="text-3xl font-bold mb-8">Meus Pedidos</h1>
 
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-lg">
-              {user.full_name ? user.full_name.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <h2 className="font-semibold text-lg">{user.full_name ?? user.email}</h2>
-              <p className="text-sm text-gray-600">{user.email}</p>
-            </div>
-          </div>
-        </div>
-
-        {error && (
-          <div className="bg-red-50 border border-red-100 text-red-700 px-6 py-4 rounded-lg mb-6">
-            {error}
-          </div>
-        )}
-
-        {isLoading ? (
+        {orders.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-12 text-center">
-            <p className="text-gray-500">Carregando pedidos...</p>
-          </div>
-        ) : orders.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-12 text-center">
-            <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold mb-2">Nenhum pedido ainda</h2>
-            <p className="text-gray-600 mb-6">Comece a explorar nosso catálogo!</p>
+            <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Nenhum pedido encontrado</h2>
+            <p className="text-gray-600 mb-6">Você ainda não fez nenhum pedido.</p>
             <button
               onClick={() => navigate('/catalog')}
-              className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+              className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
             >
-              Explorar Livros
+              Explorar Catálogo
             </button>
           </div>
         ) : (
           <div className="space-y-6">
-            {orders.map((order) => {
-              const badge = getStatusBadge(order.status);
-              return (
-                <div key={order.id} className="bg-white rounded-lg shadow-md overflow-hidden">
-                  <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Número do Pedido</p>
-                        <p className="font-semibold text-blue-600">{order.order_number}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Data</p>
-                        <p className="font-semibold">{new Date(order.created_at).toLocaleDateString('pt-BR')}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Total</p>
-                        <p className="font-semibold">R$ {order.total.toFixed(2)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Status</p>
-                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${badge.color}`}>
-                          {badge.label}
-                        </span>
-                      </div>
+            {orders.map((order) => (
+              <div key={order.id} className="bg-white rounded-lg shadow-md overflow-hidden">
+                {/* Order Header */}
+                <div className="bg-gray-50 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <div className="text-sm text-gray-600 mb-1">
+                      Pedido {order.order_number}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      {new Date(order.created_at).toLocaleDateString('pt-BR', {
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric',
+                      })}
                     </div>
                   </div>
+                  {getStatusBadge(order.status)}
+                </div>
 
-                  <div className="p-6">
-                    <div className="space-y-4 mb-4">
-                      {order.items.map((item) => (
+                {/* Order Items */}
+                <div className="p-6">
+                  <div className="space-y-4 mb-6">
+                    {order.items.map((item) => {
+                      const product = products[item.product_id];
+                      return (
                         <div key={item.id} className="flex gap-4">
                           <img
-                            src={item.product.image}
-                            alt={item.product.title}
-                            className="w-16 h-20 object-cover rounded"
+                            src={product?.image || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=600&h=800&fit=crop'}
+                            alt={product?.title || 'Produto'}
+                            className="w-20 h-28 object-cover rounded"
                           />
                           <div className="flex-1">
-                            <h4 className="font-semibold mb-1">{item.product.title}</h4>
-                            <p className="text-sm text-gray-600">
-                              {item.product.type === 'digital' ? 'E-book Digital' : 'Livro Físico'} • Qtd: {item.quantity}
+                            <h3 className="font-semibold mb-1">
+                              {product?.title || `Produto #${item.product_id}`}
+                            </h3>
+                            <p className="text-sm text-gray-600 mb-2">
+                              {product?.author || 'Autor desconhecido'}
                             </p>
-                            <p className="text-sm font-semibold text-blue-600 mt-1">
-                              R$ {(item.unit_price * item.quantity).toFixed(2)}
-                            </p>
+                            <div className="flex items-center gap-4 text-sm">
+                              <span className="text-gray-600">
+                                Quantidade: {item.quantity}
+                              </span>
+                              <span className="font-semibold text-blue-600">
+                                R$ {item.unit_price.toFixed(2)}
+                              </span>
+                            </div>
+                            {product?.product_type === 'ebook' && (
+                              <span className="inline-block mt-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                                E-book
+                              </span>
+                            )}
                           </div>
                         </div>
-                      ))}
+                      );
+                    })}
+                  </div>
+
+                  {/* Order Summary */}
+                  <div className="border-t pt-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-gray-600">Subtotal:</span>
+                      <span>R$ {order.subtotal.toFixed(2)}</span>
                     </div>
-
-                    <div className="border-t border-gray-200 pt-4 mt-4">
-                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                        {order.shipping > 0 && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Truck className="w-4 h-4 text-gray-500" />
-                            <span className="text-gray-600">Frete:</span>
-                            <span className="font-semibold">R$ {order.shipping.toFixed(2)}</span>
-                          </div>
-                        )}
-
-                        <div className="flex gap-3">
-                          {order.items.some((item) => item.product.type === 'digital') && order.status !== 'cancelled' && (
-                            <button className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm">
-                              <Download className="w-4 h-4" />
-                              Download
-                            </button>
-                          )}
-                        </div>
+                    {order.shipping > 0 && (
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-gray-600">Frete:</span>
+                        <span>R$ {order.shipping.toFixed(2)}</span>
                       </div>
+                    )}
+                    {order.discount > 0 && (
+                      <div className="flex justify-between items-center mb-2 text-green-600">
+                        <span>Desconto:</span>
+                        <span>- R$ {order.discount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center font-semibold text-lg border-t pt-2">
+                      <span>Total:</span>
+                      <span className="text-blue-600">R$ {order.total.toFixed(2)}</span>
                     </div>
                   </div>
+
+                  {/* Order Note */}
+                  {order.note && (
+                    <div className="mt-4 pt-4 border-t">
+                      <h4 className="text-sm font-semibold text-gray-700 mb-1">Observações:</h4>
+                      <p className="text-sm text-gray-600">{order.note}</p>
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="mt-6 flex gap-3">
+                    <button
+                      onClick={() => navigate(`/order/${order.id}`)}
+                      className="flex items-center gap-2 px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
+                    >
+                      <Eye className="w-4 h-4" />
+                      Ver Detalhes
+                    </button>
+                  </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
       </div>

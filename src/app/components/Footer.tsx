@@ -39,6 +39,18 @@ export const Footer = () => {
             </ul>
           </div>
 
+          {/* Categories */}
+          <div>
+            <h3 className="text-white font-semibold mb-4">Categorias</h3>
+            <ul className="space-y-2 text-sm">
+              <li>Deep Learning</li>
+              <li>Blockchain</li>
+              <li>Cibersegurança</li>
+              <li>NLP</li>
+              <li>Visão Computacional</li>
+            </ul>
+          </div>
+
           {/* Contact */}
           <div>
             <h3 className="text-white font-semibold mb-4">Contato</h3>
@@ -53,7 +65,7 @@ export const Footer = () => {
               </li>
               <li className="flex items-center gap-2">
                 <MapPin className="w-4 h-4" />
-                <span>Campina Grande, PB</span>
+                <span>São Paulo, SP</span>
               </li>
             </ul>
           </div>

@@ -6,22 +6,17 @@ import { useState } from 'react';
 
 export const Header = () => {
   const { totalItems } = useCart();
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout, isAuthenticated, isAdmin, isSeller } = useAuth();
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
-  const handleLogout = async () => {
-    await logout();
+  const handleLogout = () => {
+    logout();
     setUserMenuOpen(false);
     navigate('/');
   };
-
-  const userInitial = user?.full_name ? user.full_name.charAt(0).toUpperCase() : user?.email?.charAt(0).toUpperCase() ?? 'U';
-  const isAdmin = user?.role === 'admin';
-  const displayName = user?.full_name ?? user?.email ?? 'Usuário';
-  const roleLabel = isAdmin ? 'Administrador' : 'Cliente';
 
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
@@ -80,22 +75,20 @@ export const Header = () => {
                   aria-label="Menu do usuário"
                 >
                   <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-semibold text-sm">
-                    {userInitial}
+                    {user?.full_name?.charAt(0).toUpperCase()}
                   </div>
                 </button>
 
                 {userMenuOpen && (
                   <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50">
                     <div className="px-4 py-3 border-b border-gray-200">
-                      <p className="font-semibold">{displayName}</p>
-                      <p className="text-sm text-gray-600">{user.email}</p>
-                      <span
-                        className={`inline-flex gap-1 mt-2 rounded-full  text-xs font-semibold ${
-                          isAdmin ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'
-                        }`}
-                      >
-                        {roleLabel}
-                      </span>
+                      <p className="font-semibold">{user?.full_name}</p>
+                      <p className="text-sm text-gray-600">{user?.email}</p>
+                      {user?.role && (
+                        <span className="inline-block mt-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                          {user.role === 'admin' ? 'Administrador' : user.role === 'seller' ? 'Vendedor' : 'Cliente'}
+                        </span>
+                      )}
                     </div>
                     <Link
                       to="/my-orders"
