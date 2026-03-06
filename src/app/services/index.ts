@@ -8,3 +8,4 @@ export * from './cartService';
 export * from './adminService';
 export * from './shippingService';
 export * from './mercadoPagoService';
+export * from './emailService';

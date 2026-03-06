@@ -4,7 +4,7 @@ import { router } from './routes';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Toaster } from 'sonner';
-import { orderService, type OrderStatus } from './services';
+import { orderService, type OrderStatus, sendOrderStatusEmail } from './services';
 
 const ORDER_STATUS_SEQUENCE: OrderStatus[] = [
   'awaiting_payment',
@@ -55,6 +55,15 @@ function MockOrderStatusManager() {
       try {
         await orderService.update(user.uid, orderId, { status: nextStatus }, accessToken);
         sessionStorage.setItem('lastOrderStatusIndex', String(statusIndex));
+        try {
+          await sendOrderStatusEmail({
+            toEmail: user.email,
+            status: nextStatus,
+            orderNumber: String(orderId),
+          });
+        } catch (emailError) {
+          console.error('Erro ao enviar e-mail de status do pedido', emailError);
+        }
       } catch (error) {
         console.error('Erro ao atualizar status do pedido (mock)', error);
       }
