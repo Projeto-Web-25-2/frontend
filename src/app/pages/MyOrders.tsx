@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Package, Eye, Download, Truck } from 'lucide-react';
-import { useNavigate } from 'react-router';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { orderService, productService } from '../services';
 import { mapProductResponseToProduct } from '../utils/productMapper';
@@ -25,7 +25,7 @@ interface OrderView {
 }
 
 export const MyOrders = () => {
-  const { user, accessToken, isAuthenticated } = useAuth();
+  const { user, accessToken, isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<OrderView[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -33,10 +33,10 @@ export const MyOrders = () => {
   const [visibleCount, setVisibleCount] = useState(10);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthLoading && !isAuthenticated) {
       navigate('/signin');
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthLoading, isAuthenticated, navigate]);
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -119,6 +119,20 @@ export const MyOrders = () => {
 
   const getStatusBadge = (status: string) => statusLabels[status] ?? { label: status, color: 'bg-gray-100 text-gray-800' };
 
+  const handleDownloadTxt = (fileName: string) => {
+    const blob = new Blob(['texto'], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${fileName}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -165,6 +179,7 @@ export const MyOrders = () => {
           <div className="space-y-6">
             {orders.slice(0, visibleCount).map((order) => {
               const badge = getStatusBadge(order.status);
+              const firstDigitalItem = order.items.find((item) => item.product.type === 'digital');
               return (
                 <div key={order.id} className="bg-white rounded-lg shadow-md overflow-hidden">
                   <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
@@ -223,8 +238,12 @@ export const MyOrders = () => {
                         )}
 
                         <div className="flex gap-3">
-                          {order.items.some((item) => item.product.type === 'digital') && order.status !== 'cancelled' && (
-                            <button className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm">
+                          {order.items.some((item) => item.product.type === 'digital') && order.status !== 'cancelled' && firstDigitalItem && (
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadTxt(firstDigitalItem.product.title)}
+                              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                            >
                               <Download className="w-4 h-4" />
                               Download
                             </button>

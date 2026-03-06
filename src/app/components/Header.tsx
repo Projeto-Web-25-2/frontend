@@ -1,5 +1,5 @@
 import { ShoppingCart, Search, Menu, Book, User, LogOut, Package } from 'lucide-react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useState } from 'react';
@@ -20,8 +20,9 @@ export const Header = () => {
 
   const userInitial = user?.full_name ? user.full_name.charAt(0).toUpperCase() : user?.email?.charAt(0).toUpperCase() ?? 'U';
   const isAdmin = user?.role === 'admin';
+  const isPublisher = user?.role === 'publisher';
   const displayName = user?.full_name ?? user?.email ?? 'Usuário';
-  const roleLabel = isAdmin ? 'Administrador' : 'Cliente';
+  const roleLabel = isAdmin ? 'Administrador' : isPublisher ? 'Editor' : 'Cliente';
 
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
@@ -44,6 +45,11 @@ export const Header = () => {
             {isAdmin && (
               <Link to="/admin" className="text-gray-700 hover:text-blue-600 transition-colors">
                 Admin
+              </Link>
+            )}
+            {isPublisher && (
+              <Link to="/editor" className="text-gray-700 hover:text-blue-600 transition-colors">
+                Editor
               </Link>
             )}
           </nav>
@@ -91,7 +97,11 @@ export const Header = () => {
                       <p className="text-sm text-gray-600">{user.email}</p>
                       <span
                         className={`inline-flex gap-1 mt-2 rounded-full  text-xs font-semibold ${
-                          isAdmin ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'
+                          isAdmin
+                            ? 'bg-purple-100 text-purple-700'
+                            : isPublisher
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-gray-100 text-gray-700'
                         }`}
                       >
                         {roleLabel}
@@ -113,6 +123,16 @@ export const Header = () => {
                       >
                         <User className="w-4 h-4 text-gray-500" />
                         <span>Painel Admin</span>
+                      </Link>
+                    )}
+                    {isPublisher && (
+                      <Link
+                        to="/editor"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors"
+                      >
+                        <User className="w-4 h-4 text-gray-500" />
+                        <span>Painel Editor</span>
                       </Link>
                     )}
                     <button
@@ -190,6 +210,15 @@ export const Header = () => {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Admin
+              </Link>
+            )}
+            {isPublisher && (
+              <Link
+                to="/editor"
+                className="text-gray-700 hover:text-blue-600 transition-colors"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Editor
               </Link>
             )}
             {!isAuthenticated && (

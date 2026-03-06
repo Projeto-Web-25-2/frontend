@@ -43,9 +43,11 @@ export const Catalog = () => {
 
   const dynamicCategories = useMemo(() => {
     const uniqueCategories = new Set<string>();
-    products.forEach((product) => {
-      if (product.category) uniqueCategories.add(product.category);
-    });
+    products
+      .filter((product) => product.active ?? true)
+      .forEach((product) => {
+        if (product.category) uniqueCategories.add(product.category);
+      });
     return Array.from(uniqueCategories);
   }, [products]);
 
@@ -55,6 +57,7 @@ export const Catalog = () => {
   }, [dynamicCategories]);
 
   const filteredProducts = products.filter((product) => {
+    if (product.active === false) return false;
     const categoryMatch = selectedCategory === 'Todos' || product.category === selectedCategory;
     const typeMatch = selectedType === 'all' || product.type === selectedType;
     

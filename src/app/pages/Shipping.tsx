@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useCart } from '../context/CartContext';
-import { useNavigate } from 'react-router';
+import { useNavigate } from 'react-router-dom';
 import { Truck, Clock, Package, ArrowRight, Loader2, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
@@ -260,6 +260,16 @@ export const Shipping = () => {
 
   const hasPhysicalItems = items.some((item) => item.type === 'physical');
 
+  const physicalSavedAddresses = savedAddresses.filter((address) => {
+    const isVirtualAddress =
+      address.street === 'Entrega Digital' ||
+      address.city === 'Online' ||
+      address.state_code === 'NA' ||
+      address.zip_code === '00000000';
+
+    return !isVirtualAddress;
+  });
+
   const fetchSavedAddresses = useCallback(async () => {
     if (!user || !accessToken) return;
     setIsLoadingAddresses(true);
@@ -284,10 +294,14 @@ export const Shipping = () => {
   }, [user, accessToken, fetchSavedAddresses]);
 
   useEffect(() => {
+    // Quando não há itens físicos, garantimos que o estado de frete esteja limpo
+    // mas evitamos ficar chamando setState em todo render.
     if (!hasPhysicalItems) {
-      setShippingOptions([]);
-      setSelectedShipping('');
-      setCepCalculated(false);
+      if (shippingOptions.length !== 0 || selectedShipping !== '' || cepCalculated) {
+        setShippingOptions([]);
+        setSelectedShipping('');
+        setCepCalculated(false);
+      }
       return;
     }
 
@@ -301,7 +315,7 @@ export const Shipping = () => {
     if (!shippingOptions.some((option) => option.id === selectedShipping)) {
       setSelectedShipping(shippingOptions[0].id);
     }
-  }, [hasPhysicalItems, shippingOptions, selectedShipping]);
+  }, [hasPhysicalItems, shippingOptions, selectedShipping, cepCalculated]);
 
   const isPhysicalAddressComplete = () =>
     Boolean(
@@ -593,9 +607,19 @@ export const Shipping = () => {
         addressUid = virtualAddress.uid;
       }
 
+      const shippingOption = hasPhysicalItems
+        ? shippingOptions.find((opt) => opt.id === selectedShipping) || null
+        : {
+            id: 'digital-free',
+            name: 'Entrega Digital',
+            price: 0,
+            deliveryTime: 'Disponível imediatamente após pagamento',
+            icon: 'clock' as const,
+          };
+
       const shippingData = {
         personalInfo: formData,
-        shippingOption: shippingOptions.find((opt) => opt.id === selectedShipping) || null,
+        shippingOption,
         addressUid,
       };
       sessionStorage.setItem('shippingData', JSON.stringify(shippingData));
@@ -681,130 +705,132 @@ export const Shipping = () => {
                 </div>
               </div>
 
-              {/* Shipping Address */}
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-xl font-bold mb-4">Endereço de Entrega</h2>
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Shipping Address - apenas para itens físicos */}
+              {hasPhysicalItems && (
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <h2 className="text-xl font-bold mb-4">Endereço de Entrega</h2>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <input
+                        type="text"
+                        name="cep"
+                        placeholder="CEP *"
+                        value={formData.cep}
+                        onChange={handleInputChange}
+                        className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        maxLength={9}
+                      />
+                      <div className="md:col-span-2 flex flex-wrap items-center gap-3">
+                        {isFetchingCep && (
+                          <div className="text-sm text-blue-600 flex items-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Consultando CEP...
+                          </div>
+                        )}
+                        {cepCalculated && hasPhysicalItems && shippingOptions.length > 0 && !isCalculatingShipping && (
+                          <div className="text-sm text-green-600 flex items-center gap-2">
+                            ✓ Frete calculado
+                          </div>
+                        )}
+                        {hasPhysicalItems && !cepCalculated && !isFetchingCep && (
+                          <div className="text-sm text-gray-500 flex items-center gap-2">
+                            Informe o CEP para calcular o frete
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {hasPhysicalItems && (
+                      <button
+                        type="button"
+                        onClick={handleManualShippingCalculation}
+                        disabled={!canCalculateShipping || isCalculatingShipping}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-blue-200 text-blue-700 rounded-lg text-sm font-semibold hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full md:w-auto"
+                      >
+                        {isCalculatingShipping ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Calculando frete...
+                          </>
+                        ) : (
+                          'Calcular frete'
+                        )}
+                      </button>
+                    )}
                     <input
                       type="text"
-                      name="cep"
-                      placeholder="CEP *"
-                      value={formData.cep}
+                      name="address"
+                      placeholder="Endereço *"
+                      value={formData.address}
                       onChange={handleInputChange}
                       className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      maxLength={9}
                     />
-                    <div className="md:col-span-2 flex flex-wrap items-center gap-3">
-                      {isFetchingCep && (
-                        <div className="text-sm text-blue-600 flex items-center gap-2">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Consultando CEP...
-                        </div>
-                      )}
-                      {cepCalculated && hasPhysicalItems && shippingOptions.length > 0 && !isCalculatingShipping && (
-                        <div className="text-sm text-green-600 flex items-center gap-2">
-                          ✓ Frete calculado
-                        </div>
-                      )}
-                      {hasPhysicalItems && !cepCalculated && !isFetchingCep && (
-                        <div className="text-sm text-gray-500 flex items-center gap-2">
-                          Informe o CEP para calcular o frete
-                        </div>
-                      )}
+                    <input
+                      type="text"
+                      name="neighborhood"
+                      placeholder="Bairro *"
+                      value={formData.neighborhood}
+                      onChange={handleInputChange}
+                      className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <input
+                        type="text"
+                        name="number"
+                        placeholder="Número *"
+                        value={formData.number}
+                        onChange={handleInputChange}
+                        className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <input
+                        type="text"
+                        name="complement"
+                        placeholder="Complemento"
+                        value={formData.complement}
+                        onChange={handleInputChange}
+                        className="md:col-span-2 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <input
+                        type="text"
+                        name="city"
+                        placeholder="Cidade *"
+                        value={formData.city}
+                        onChange={handleInputChange}
+                        className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <input
+                        type="text"
+                        name="state"
+                        placeholder="Estado *"
+                        value={formData.state}
+                        onChange={handleInputChange}
+                        className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        maxLength={2}
+                      />
                     </div>
                   </div>
                   {hasPhysicalItems && (
-                    <button
-                      type="button"
-                      onClick={handleManualShippingCalculation}
-                      disabled={!canCalculateShipping || isCalculatingShipping}
-                      className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-blue-200 text-blue-700 rounded-lg text-sm font-semibold hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full md:w-auto"
-                    >
-                      {isCalculatingShipping ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Calculando frete...
-                        </>
-                      ) : (
-                        'Calcular frete'
-                      )}
-                    </button>
+                    <div className="pt-4 border-t border-gray-100">
+                      <button
+                        type="button"
+                        onClick={handleSaveAddress}
+                        disabled={isSavingAddress}
+                        className="w-full md:w-auto bg-gray-900 text-white px-4 py-2 rounded-lg font-semibold hover:bg-gray-800 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {isSavingAddress ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Salvando endereço...
+                          </>
+                        ) : (
+                          'Salvar endereço'
+                        )}
+                      </button>
+                    </div>
                   )}
-                  <input
-                    type="text"
-                    name="address"
-                    placeholder="Endereço *"
-                    value={formData.address}
-                    onChange={handleInputChange}
-                    className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <input
-                    type="text"
-                    name="neighborhood"
-                    placeholder="Bairro *"
-                    value={formData.neighborhood}
-                    onChange={handleInputChange}
-                    className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <input
-                      type="text"
-                      name="number"
-                      placeholder="Número *"
-                      value={formData.number}
-                      onChange={handleInputChange}
-                      className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <input
-                      type="text"
-                      name="complement"
-                      placeholder="Complemento"
-                      value={formData.complement}
-                      onChange={handleInputChange}
-                      className="md:col-span-2 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input
-                      type="text"
-                      name="city"
-                      placeholder="Cidade *"
-                      value={formData.city}
-                      onChange={handleInputChange}
-                      className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <input
-                      type="text"
-                      name="state"
-                      placeholder="Estado *"
-                      value={formData.state}
-                      onChange={handleInputChange}
-                      className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      maxLength={2}
-                    />
-                  </div>
                 </div>
-                {hasPhysicalItems && (
-                  <div className="pt-4 border-t border-gray-100">
-                    <button
-                      type="button"
-                      onClick={handleSaveAddress}
-                      disabled={isSavingAddress}
-                      className="w-full md:w-auto bg-gray-900 text-white px-4 py-2 rounded-lg font-semibold hover:bg-gray-800 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                      {isSavingAddress ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Salvando endereço...
-                        </>
-                      ) : (
-                        'Salvar endereço'
-                      )}
-                    </button>
-                  </div>
-                )}
-              </div>
+              )}
 
               {hasPhysicalItems && isAuthenticated && (
                 <div className="bg-white rounded-lg shadow-md p-6">
@@ -823,11 +849,11 @@ export const Shipping = () => {
                     <p className="text-sm text-gray-500 flex items-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin" /> Carregando endereços...
                     </p>
-                  ) : savedAddresses.length === 0 ? (
+                  ) : physicalSavedAddresses.length === 0 ? (
                     <p className="text-sm text-gray-500">Você ainda não possui endereços salvos.</p>
                   ) : (
                     <div className="space-y-3">
-                      {savedAddresses.map((address) => (
+                      {physicalSavedAddresses.map((address) => (
                         <label
                           key={address.uid}
                           className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${

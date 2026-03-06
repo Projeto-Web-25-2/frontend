@@ -55,6 +55,7 @@ export const mapProductResponseToProduct = (response: ProductResponse): Product 
     isbn: response.isbn,
     tags: response.tags ?? [],
     featured: response.featured ?? false,
+    active: response.active ?? true,
     weight: toNumber(response.weight),
     length,
     width,

@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router';
+import { createBrowserRouter } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Home } from './pages/Home';
 import { Catalog } from './pages/Catalog';
@@ -7,6 +7,7 @@ import { Cart } from './pages/Cart';
 import { Shipping } from './pages/Shipping';
 import { Checkout } from './pages/Checkout';
 import { Admin } from './pages/Admin';
+import { Editor } from './pages/Editor';
 import { SignIn } from './pages/SignIn';
 import { SignUp } from './pages/SignUp';
 import { MyOrders } from './pages/MyOrders';
@@ -43,6 +44,10 @@ export const router = createBrowserRouter([
       {
         path: 'admin',
         Component: Admin,
+      },
+      {
+        path: 'editor',
+        Component: Editor,
       },
       {
         path: 'my-orders',

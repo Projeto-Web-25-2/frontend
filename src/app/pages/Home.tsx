@@ -1,5 +1,5 @@
 import { ArrowRight, Sparkles, Truck, CreditCard, BookOpen } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { ProductCard } from '../components/ProductCard';
 import { productService } from '../services';
@@ -31,7 +31,7 @@ export const Home = () => {
         const response = await productService.list(accessToken);
         const mapped = response.map(mapProductResponseToProduct);
         const lowStock = mapped
-          .filter((product) => product.stock > 0 && product.stock < 5)
+          .filter((product) => (product.active ?? true) && product.stock > 0 && product.stock < 5)
           .sort((a, b) => a.stock - b.stock)
           .slice(0, 6);
         setLastUnits(lowStock);

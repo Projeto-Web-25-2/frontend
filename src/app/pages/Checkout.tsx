@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useCart } from '../context/CartContext';
-import { useNavigate } from 'react-router';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
-import { orderService } from '../services';
+import { orderService, productService } from '../services';
 import { useMercadoPago } from '../hooks/useMercadoPago';
 
 export const Checkout = () => {
@@ -71,8 +71,33 @@ export const Checkout = () => {
     sessionStorage.setItem('lastOrderTotal', String(finalTotal));
     sessionStorage.setItem('lastOrderStatusIndex', '0');
     sessionStorage.removeItem('shippingData');
+
+    // Atualiza o estoque dos produtos (mock de baixa de estoque no backend)
+    try {
+      await Promise.all(
+        items.map(async (item) => {
+          const productId = Number(item.id);
+          if (Number.isNaN(productId)) return;
+
+          const currentStock = item.stock ?? 0;
+          const nextStock = Math.max(0, currentStock - item.quantity);
+
+          await productService.update(productId, { stock: nextStock }, accessToken);
+        }),
+      );
+    } catch (stockError) {
+      console.error('Erro ao atualizar estoque dos produtos', stockError);
+    }
+
+    // Limpa o carrinho após concluir o pedido
+    try {
+      await clearCart();
+    } catch (cartError) {
+      console.error('Erro ao limpar carrinho após pedido', cartError);
+    }
+
     return order;
-  }, [user, accessToken, shippingData, items, shippingCost, totalWithShipping]);
+  }, [user, accessToken, shippingData, items, shippingCost, totalWithShipping, clearCart]);
 
   const handleMercadoPagoPayment = async () => {
     if (!user || !accessToken) {
@@ -93,7 +118,6 @@ export const Checkout = () => {
     setIsSubmitting(true);
     try {
       const order = await placeOrder();
-      await clearCart();
       await createMercadoPagoCheckout({
         testeId: order?.order_number ?? String(order?.id ?? ''),
         userEmail: user.email,

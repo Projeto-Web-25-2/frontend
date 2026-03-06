@@ -1,7 +1,7 @@
 import { ShoppingCart, BookOpen } from 'lucide-react';
 import { Product } from '../data/products';
 import { useCart } from '../context/CartContext';
-import { useNavigate } from 'react-router';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 interface ProductCardProps {

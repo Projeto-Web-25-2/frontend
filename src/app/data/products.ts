@@ -9,6 +9,7 @@ export interface Product {
   description: string;
   image: string;
   stock: number;
+  active?: boolean;
   weight?: number;
   width?: number;
   height?: number;

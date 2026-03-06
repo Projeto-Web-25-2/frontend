@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Book, Mail, Lock, Loader } from 'lucide-react';
 import { toast } from 'sonner';
@@ -92,6 +92,28 @@ export const SignIn = () => {
             )}
           </button>
         </form>
+        {/* Info sobre tipos de conta */}
+        <p className="text-sm text-gray-500 mt-4 text-center">
+          Conta <span className="font-semibold">admin</span> criada:
+          {' '}
+          <span className="font-mono">admin@gmail.com</span> com senha
+          {' '}
+          <span className="font-mono">admin1</span>
+          <br />
+          Conta <span className="font-semibold">publisher</span> criada:
+          {' '}
+          <span className="font-mono">publisher@gmail.com</span> com senha
+          {' '}
+          <span className="font-mono">publisher</span>
+          <br />
+          Para testar uma conta <span className="font-semibold">admin</span> em outros usuários, use a senha
+          {' '}
+          <span className="font-mono">admin1</span>; para testar uma conta
+          {' '}
+          <span className="font-semibold">publisher</span>, use a senha
+          {' '}
+          <span className="font-mono">publisher</span>.
+        </p>
         {/* Sign Up Link */}
         <p className="text-center text-gray-600 mt-6">
           Não tem uma conta?{' '}

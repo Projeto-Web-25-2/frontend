@@ -10,7 +10,7 @@ export interface LoginResponse {
   user: {
     email: string;
     uid: string;
-    role?: 'admin' | 'user';
+    role?: 'admin' | 'user' | 'publisher';
   };
 }
 
@@ -30,7 +30,7 @@ export interface UserResponse {
   full_name: string;
   email: string;
   cpf: string;
-  role?: 'admin' | 'user';
+  role?: 'admin' | 'user' | 'publisher';
 }
 
 export interface UpdateUserPayload {
