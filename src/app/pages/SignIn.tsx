@@ -92,18 +92,6 @@ export const SignIn = () => {
             )}
           </button>
         </form>
-
-        {/* Demo Credentials */}
-        <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <p className="text-sm text-blue-800 font-semibold mb-2">🔐 Credenciais de Teste:</p>
-          <p className="text-xs text-blue-700">
-            <strong>Admin:</strong> admin@compia.com.br / admin123
-          </p>
-          <p className="text-xs text-blue-700">
-            <strong>Cliente:</strong> qualquer email / qualquer senha
-          </p>
-        </div>
-
         {/* Sign Up Link */}
         <p className="text-center text-gray-600 mt-6">
           Não tem uma conta?{' '}

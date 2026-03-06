@@ -64,8 +64,12 @@ export const Checkout = () => {
     setOrderNumber(order.order_number);
     const finalTotal = 0;
     setFinalAmount(finalTotal);
+
+    // Persist order info for mock status progression on the frontend
+    sessionStorage.setItem('lastOrderId', String(order.id));
     sessionStorage.setItem('lastOrderNumber', order.order_number);
     sessionStorage.setItem('lastOrderTotal', String(finalTotal));
+    sessionStorage.setItem('lastOrderStatusIndex', '0');
     sessionStorage.removeItem('shippingData');
     return order;
   }, [user, accessToken, shippingData, items, shippingCost, totalWithShipping]);

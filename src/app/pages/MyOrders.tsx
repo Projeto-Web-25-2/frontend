@@ -30,6 +30,7 @@ export const MyOrders = () => {
   const [orders, setOrders] = useState<OrderView[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(10);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -44,26 +45,38 @@ export const MyOrders = () => {
       setError(null);
       try {
         const response = await orderService.list(user.uid, accessToken);
-        const enhanced: OrderView[] = [];
 
+        // Busca todos os produtos únicos de uma vez (em paralelo)
+        const uniqueProductIds = new Set<number>();
         for (const order of response) {
-          const items: OrderItemView[] = [];
           for (const item of order.items) {
+            uniqueProductIds.add(item.product_id);
+          }
+        }
+
+        const productsMap = new Map<number, Product>();
+
+        await Promise.all(
+          Array.from(uniqueProductIds).map(async (productId) => {
             try {
-              const productResponse = await productService.getById(item.product_id, accessToken);
+              const productResponse = await productService.getById(productId, accessToken);
               const product = mapProductResponseToProduct(productResponse);
-              items.push({
-                id: item.id,
-                quantity: item.quantity,
-                unit_price: item.unit_price,
-                product,
-              });
+              productsMap.set(productId, product);
             } catch (productError) {
               console.error('Erro ao carregar produto do pedido', productError);
             }
-          }
+          }),
+        );
 
-          enhanced.push({
+        const enhanced: OrderView[] = response.map((order) => {
+          const items: OrderItemView[] = order.items.map((item) => ({
+            id: item.id,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            product: productsMap.get(item.product_id) as Product,
+          }));
+
+          return {
             id: order.id,
             order_number: order.order_number,
             status: order.status,
@@ -72,10 +85,15 @@ export const MyOrders = () => {
             shipping: order.shipping,
             discount: order.discount,
             items,
-          });
-        }
+          };
+        });
 
+        // Ordena pelos pedidos mais recentes primeiro
+        enhanced.sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        );
         setOrders(enhanced);
+        setVisibleCount(10);
       } catch (err) {
         console.error('Erro ao carregar pedidos', err);
         setError('Não foi possível carregar seus pedidos.');
@@ -145,7 +163,7 @@ export const MyOrders = () => {
           </div>
         ) : (
           <div className="space-y-6">
-            {orders.map((order) => {
+            {orders.slice(0, visibleCount).map((order) => {
               const badge = getStatusBadge(order.status);
               return (
                 <div key={order.id} className="bg-white rounded-lg shadow-md overflow-hidden">
@@ -218,6 +236,18 @@ export const MyOrders = () => {
                 </div>
               );
             })}
+
+            {orders.length > visibleCount && (
+              <div className="flex justify-center mt-4">
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount((prev) => prev + 10)}
+                  className="px-6 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors"
+                >
+                  Ver mais pedidos
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
