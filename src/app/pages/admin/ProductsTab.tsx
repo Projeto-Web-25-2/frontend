@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Edit, Trash, Search, Filter, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { products as initialProducts, categories } from '../../data/products';
@@ -58,9 +58,22 @@ export const ProductsTab = ({ accessToken, isAdmin }: ProductsTabProps) => {
   const canSubmitProduct = Boolean(
     newProduct.title.trim() &&
     newProduct.price.trim() &&
-    newProduct.stock.trim() &&
     newProduct.description.trim(),
   );
+
+  // If product is digital, we don't allow selecting stock and set it to 100 internally
+  const prevIsDigitalRef = useRef<boolean>(false);
+  useEffect(() => {
+    if (newProduct.type === 'digital') {
+      setNewProduct((prev) => ({ ...prev, stock: '100' }));
+    } else {
+      // when switching back to physical, clear stock so admin must enter a value
+      if (prevIsDigitalRef.current) {
+        setNewProduct((prev) => ({ ...prev, stock: '' }));
+      }
+    }
+    prevIsDigitalRef.current = newProduct.type === 'digital';
+  }, [newProduct.type]);
 
   const handleProductFieldChange = (field: keyof NewProductForm, value: string) => {
     setNewProduct((prev) => ({ ...prev, [field]: value }));
@@ -251,15 +264,23 @@ export const ProductsTab = ({ accessToken, isAdmin }: ProductsTabProps) => {
               <option value="physical">Livro Físico</option>
               <option value="digital">E-book</option>
             </select>
-            <input
-              type="number"
-              placeholder="Estoque"
-              value={newProduct.stock}
-              onChange={(event) => handleProductFieldChange('stock', event.target.value)}
-              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              min="0"
-              required
-            />
+
+            {/* If digital, don't allow admin to set stock and show an informational label; stock is set to 100 internally */}
+            {newProduct.type === 'physical' ? (
+              <input
+                type="number"
+                placeholder="Estoque"
+                value={newProduct.stock}
+                onChange={(event) => handleProductFieldChange('stock', event.target.value)}
+                className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                min="0"
+                required
+              />
+            ) : (
+              <div className="px-4 py-3 border border-gray-100 rounded-lg text-sm text-gray-600 flex items-center">
+                Estoque automático: 100
+              </div>
+            )}
             <input
               type="number"
               placeholder="Número de páginas"
@@ -435,15 +456,13 @@ export const ProductsTab = ({ accessToken, isAdmin }: ProductsTabProps) => {
                       </td>
                       <td className="py-4 px-4 font-semibold">R$ {product.price.toFixed(2)}</td>
                       <td className="py-4 px-4">
-                        <span
-                          className={
-                            product.stock < 10 && product.type === 'physical'
-                              ? 'text-orange-600 font-semibold'
-                              : 'text-gray-700'
-                          }
-                        >
-                          {product.stock}
-                        </span>
+                        {product.type === 'physical' ? (
+                          <span className={product.stock < 10 ? 'text-orange-600 font-semibold' : 'text-gray-700'}>
+                            {product.stock}
+                          </span>
+                        ) : (
+                          <span className="text-gray-500 italic">—</span>
+                        )}
                       </td>
                       <td className="py-4 px-4">
                         <div className="flex gap-2">
