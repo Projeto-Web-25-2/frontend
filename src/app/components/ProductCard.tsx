@@ -70,13 +70,18 @@ export const ProductCard = ({ product }: ProductCardProps) => {
             </div>
           </div>
 
-          <button
-            onClick={handleAddToCart}
-            className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition-colors"
-            aria-label="Adicionar ao carrinho"
-          >
-            <ShoppingCart className="w-5 h-5" />
-          </button>
+          {/* Hide add-to-cart when out of stock */}
+          {product.stock === 0 ? (
+            <div className="text-sm text-red-600 font-semibold px-3 py-2">Esgotado</div>
+          ) : (
+            <button
+              onClick={handleAddToCart}
+              className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition-colors"
+              aria-label="Adicionar ao carrinho"
+            >
+              <ShoppingCart className="w-5 h-5" />
+            </button>
+          )}
         </div>
 
         {product.stock < 10 && product.type === 'physical' && (

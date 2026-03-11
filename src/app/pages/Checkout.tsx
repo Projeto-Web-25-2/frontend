@@ -73,9 +73,13 @@ export const Checkout = () => {
     sessionStorage.removeItem('shippingData');
 
     // Atualiza o estoque dos produtos (mock de baixa de estoque no backend)
+    // Não atualiza estoque para itens digitais (e-books)
     try {
       await Promise.all(
         items.map(async (item) => {
+          // Skip stock update for digital products
+          if (item.type === 'digital') return;
+
           const productId = Number(item.id);
           if (Number.isNaN(productId)) return;
 
