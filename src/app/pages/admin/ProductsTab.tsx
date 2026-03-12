@@ -467,13 +467,6 @@ export const ProductsTab = ({ accessToken, isAdmin }: ProductsTabProps) => {
                       <td className="py-4 px-4">
                         <div className="flex gap-2">
                           <button
-                            onClick={() => toast.info('Funcionalidade em desenvolvimento')}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                            aria-label="Editar"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
                             onClick={() => handleDeleteProduct(product.id)}
                             className={`p-2 rounded transition-colors ${
                               product.active === false
