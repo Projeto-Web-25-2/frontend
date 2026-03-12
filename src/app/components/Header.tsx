@@ -56,13 +56,6 @@ export const Header = () => {
 
           {/* Search & Cart & User */}
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => setSearchOpen(!searchOpen)}
-              className="p-2 text-gray-700 hover:text-blue-600 transition-colors"
-              aria-label="Buscar"
-            >
-              <Search className="w-5 h-5" />
-            </button>
 
             <button
               onClick={() => navigate('/cart')}
