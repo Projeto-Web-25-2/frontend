@@ -170,7 +170,7 @@ export const ProductsTab = ({ accessToken, isAdmin }: ProductsTabProps) => {
         category: categoryValue,
         isbn: newProduct.isbn.trim() || undefined,
         num_pages: pagesNumber,
-        image_url: newProduct.image.trim() || undefined,
+        image: newProduct.image.trim() || undefined,
       };
 
       const created = await productService.create(payload, accessToken);
@@ -278,7 +278,7 @@ export const ProductsTab = ({ accessToken, isAdmin }: ProductsTabProps) => {
               />
             ) : (
               <div className="px-4 py-3 border border-gray-100 rounded-lg text-sm text-gray-600 flex items-center">
-                Estoque automático: 100
+                Estoque automático(digital)
               </div>
             )}
             <input
