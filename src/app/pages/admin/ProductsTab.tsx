@@ -298,7 +298,7 @@ export const ProductsTab = ({ accessToken, isAdmin }: ProductsTabProps) => {
             />
             <input
               type="url"
-              placeholder="URL da Imagem"
+              placeholder="URL da Imagem (precisa ser url direta para a foto, não pode drive)"
               value={newProduct.image}
               onChange={(event) => handleProductFieldChange('image', event.target.value)}
               className="md:col-span-2 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
