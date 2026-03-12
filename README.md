@@ -1,11 +1,50 @@
+#  Ecommerce de Livros
 
-  # Ecommerce de livros
+Projeto de um **E-commerce de livros**, desenvolvido como aplicação web
+com frontend e backend separados.
 
-  This is a code bundle for Ecommerce de livros. The original project is available at [ecommerce](https://frontend-ochre-three-81.vercel.app/).
+##  Participantes
 
-  ## Running the code
+-   **Pedro Henrique Veloso Fernandes** --- 122110181
+-   **Victor Carneiro dos Santos Angelo** --- 122110725
 
-  Run `npm i` to install the dependencies.
+------------------------------------------------------------------------
 
-  Run `npm run dev` to start the development server.
-  
+#  Aplicação Online
+
+A aplicação pode ser acessada em:
+
+ https://frontend-ochre-three-81.vercel.app/
+
+------------------------------------------------------------------------
+
+#  Repositórios do Projeto
+
+### Frontend
+
+https://github.com/Projeto-Web-25-2/frontend
+
+### Backend
+
+https://github.com/Projeto-Web-25-2/backend
+
+------------------------------------------------------------------------
+
+#  Tecnologias Utilizadas
+
+Frontend: - React - Vite - TypeScript
+
+Backend: - Python - FastAPI - SQLModel
+
+------------------------------------------------------------------------
+
+#  Observação
+
+O projeto consiste em um sistema de **comércio eletrônico para venda de
+livros**, contendo funcionalidades como:
+
+-   cadastro e listagem de produtos
+-   carrinho de compras
+-   cálculo de frete
+-   processamento de pedidos
+-   envio de notificações por email
